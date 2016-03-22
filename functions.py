@@ -13,6 +13,8 @@ We will do the following:
     entry is one.
 """
 
+
+
 # if this cannot make a reduced echelon form it will throw an error
 def reduceMatrix(matrix):
     for i in range(0, len(matrix)):
@@ -51,3 +53,35 @@ def reduceMatrix(matrix):
             # the current row
             for k in range(0, len(deletion_row)):
                 current_row[k] = current_row[k] - coefficient * deletion_row[k]
+
+class Vector:
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def __add__(self, other):
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):
+        return Vector(self.x - other.x, self.y - other.y)
+
+# this will make a matrix go from column to row or vice versa
+# essentially the transpose
+def flipMatrix(matrix):
+    flipped_matrix = []
+    for i in range(0, len(matrix[0])):
+        flipped_matrix.append([0] * len(matrix))
+    for i in range(0, len(matrix[0])):
+        for j in range(0, len(matrix)):
+            flipped_matrix[i][j] = matrix[j][i]
+    return flipped_matrix
+
+def getConditions(matrix):
+    # first we turn it to reduced echelon form
+    reduceMatrix(matrix)
+    # then we change to column matrix
+    matrix = flipMatrix(matrix)
+    # now we grab the columns that do not have a single one in them
+    conditions_matrix = matrix[len(matrix[0]):]
+    return conditions_matrix
