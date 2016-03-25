@@ -32,6 +32,9 @@ class BaseOneList:
     def append(self, element):
         self.list.append(element)
 
+    def length(self):
+        return len(self.list)
+
     def __setitem__(self, key):
         if type(key) == int and key > 0:
             try:
@@ -49,6 +52,17 @@ class BaseOneList:
                 raise Issue('key was out of bounds')
         else:
             raise Issue('key was not an integer')
+
+    def __eq__(self, other):
+        if self.length() != other.length():
+            return False
+        for i in range(1, self.length + 1):
+            if self[i] != other[i]:
+                return False
+        return True
+
+    def __str__(self):
+        return str(self.list)
 
 def createZeroBOL(self, size):
     BOL = BaseOneList()
