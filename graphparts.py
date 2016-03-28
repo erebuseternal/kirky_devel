@@ -39,6 +39,7 @@ class Edge:
         self.tail_vertex = Vertex(self.tail_position)
         self.num_edges = num_edges
         self.position = self.head_position
+        self.id = None
 
     def addHead(self, position):
         if not isinstance(position, BaseOneList):
@@ -169,6 +170,7 @@ def Block:
         index_edge = self.edge_indexes[vector_id].getElement(edge)
         if not index_edge:
             self.edges.append(edge)
+            edge.id = self.edges.length()
             self.edge_indexes[vector_id].addElement(edge)
         else:
             edge = index_edge
