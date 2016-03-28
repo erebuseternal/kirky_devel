@@ -42,6 +42,18 @@ class BaseOneList:
             self.current += 1
             return element
 
+    def __sub__(self, other):
+        new_list = BaseOneList()
+        for i in range(1, self.length() + 1):
+            new_list.append(self[i] - other[i])
+        return new_list
+
+    def __ad__(self, other):
+        new_list = BaseOneList()
+        for i in range(1, self.length() + 1):
+            new_list.append(self[i] + other[i])
+        return new_list
+
     def append(self, element):
         self.list.append(element)
 

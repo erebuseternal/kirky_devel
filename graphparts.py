@@ -4,6 +4,8 @@
 
 from matrix import *
 
+from copy import deepcopy
+
 class Vertex:
 
     def __init__(self, position):
@@ -29,13 +31,14 @@ class Vertex:
 
 class Edge:
 
-    def __init__(self, vector_id, head, tail, num_edges=0):
+    def __init__(self, vector_id, head, tail, num_edges=1):
         self.vector_id = vector_id
         self.addHead(head)
         self.addTail(tail)
-        self.head_vertex = None
-        self.tail_vertex = None
+        self.head_vertex = Vertex(self.head_position)
+        self.tail_vertex = Vertex(self.tail_position)
         self.num_edges = num_edges
+        self.position = self.head_position
 
     def addHead(self, position):
         if not isinstance(position, BaseOneList):
@@ -100,9 +103,9 @@ class Index:
         start = entry - difference
         return Range(start, self.range)
 
-    def addVertex(self, vertex):
+    def addElement(self, element):
         # first we get the vertex's position vector
-        position = vertex.position
+        position = element.position
         current_map = self.face
         count = 1
         for entry in position:
@@ -116,12 +119,12 @@ class Index:
                     current_map[r] = {}
                 current_map = current_map[r]
             count += 1
-        if vertex in current_list:
+        if element in current_list:
             return
         else:
-            current_list.append(vertex)
+            current_list.append(element)
 
-    def getVertex(self, position):
+    def getElement(self, position):
         for entry in position:
             r = self.getRange(entry)
             if count == position.length():
@@ -133,7 +136,67 @@ class Index:
                     return None
                 current_map = current_map[r]
             count += 1
-        for vertex in current_list:
-            if position == vertex.position:
-                return vertex
+        for element in current_list:
+            if position == element.position:
+                return element
         return None
+
+# this is a series of edges and vertices.
+# it allows for the block to be easily be
+# moved along any direction and return a new
+# block
+# it also allows for easy joining of two
+# blocks
+
+def Block:
+
+    def __init__(self, dimensions, range=2):
+        self.edges = []
+        self.vertices = []
+        self.vertex_index = Index(range)
+        self.edge_indexes = BaseOneList()
+        for i in range(1, dimensions + 1):
+            self.edge_indexes.append(Index(range))
+        # used for checking
+        self.dimensions = dimensions
+
+    # we add by edges
+    # this will make sure we never replicate edges or vertices
+    def addEdge(self, edge):
+        head_vertex = edge.head_vertex
+        tail_vertex = edge.tail_vertex
+        vector_id = edge.vector_id
+        index_edge = self.edge_indexes[vector_id].getElement(edge)
+        if not index_edge:
+            self.edges.append(edge)
+            self.edge_indexes[vector_id].addElement(edge)
+        else:
+            edge = index_edge
+        # we now check to see if the vertices are in our index already
+        # and if so we reset the appropriate vertex on the edge
+        index_vertex = self.vertex_index.getElement(head_vertex)
+        if not index_vertex:
+            self.vertices.append(head_vertex)
+            self.vertex_index.addElement(head_vertex)
+        else:
+            edge.addVertex(index_vertex, True)
+        index_vertex = self.vertex_index.getElement(tail_vertex)
+        if not index_vertex:
+            self.vertices.append(tail_vertex)
+            self.vertex_index.addElement(tail_vertex)
+        else:
+            edge.addVertex(index_vertex, False)
+
+
+    def shiftAndAdd(self, amount, dimension):
+        if dimension > self.dimensions:
+            raise Issue('this dimension is outside of the dimensions of this block')
+        for edge in self.edges:
+            new_edge = deepcopy(edge)
+            new_edge.head_position[dimension] += amount
+            new_edge.tail_position[dimension] += amount
+            self.addEdge(new_edge)
+
+    def ingest(self, block):
+        for edge in block.edges:
+            self.addEdge(edge)
