@@ -28,6 +28,19 @@ class BaseOneList:
 
     def __init__(self, array=[]):
         self.list = array
+        self.current = 1
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        if self.length() < self.current:
+            self.current = 1
+            raise StopIteration
+        else:
+            element = self[self.current]
+            self.current += 1
+            return element
 
     def append(self, element):
         self.list.append(element)
