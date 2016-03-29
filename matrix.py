@@ -15,7 +15,7 @@ Finally, you will have to define the matrix dimensions from the start
 and then you can input lists for the rows or columns.
 """
 
-from fraction import Fraction
+from fractions import Fraction
 from copy import deepcopy
 
 class Issue(Exception):
@@ -41,7 +41,7 @@ class Vector:
         # allows us to easily iterate over a base 1 vector
         # whereas python has its iteration helpers built around
         # base zero
-        self.indicies = range(1, len(self) + 1)
+        self.indices = range(1, len(self) + 1)
 
     # iteration handling ----------------------------------
     def __iter__(self):
@@ -50,7 +50,7 @@ class Vector:
     def next(self):
         # if we have are trying to access at an index beyond
         # the length we need to stop
-        if self.current > len(self):
+        if self.current_index > len(self):
             # this allows us to iterate again
             self.current_index = 1
             raise StopIteration
@@ -67,7 +67,7 @@ class Vector:
         if len(self) != len(other):
             raise Issue('vectors are of different lengths')
         new_vector = Vector()
-        for i in self.indicies:
+        for i in self.indices:
             new_vector.append(self[i] - other[i])
         return new_vector
 
@@ -75,7 +75,7 @@ class Vector:
         if len(self) != len(other):
             raise Issue('vectors are of different lengths')
         new_vector = Vector()
-        for i in self.indicies:
+        for i in self.indices:
             new_vector.append(self[i] + other[i])
         return new_vector
 
@@ -83,7 +83,7 @@ class Vector:
     # how scalar multiplication works
     def __rmul__(self, other):
         new_vector = Vector()
-        for i in self.indicies:
+        for i in self.indices:
             new_vector.append(other * self[i])
         return new_vector
     # ------------------------------------------------------
@@ -94,17 +94,17 @@ class Vector:
     def addOn(self, other):
         if len(self) != len(other):
             raise Issue('vectors are of different lengths')
-        for i in self.indicies:
+        for i in self.indices:
             self[i] = self[i] + other[i]
 
     def subtractFrom(self, other):
         if len(self) != len(other):
             raise Issue('vectors are of different lengths')
-        for i in self.indicies:
+        for i in self.indices:
             self[i] = self[i] - other[i]
 
     def scale(self, other):
-        for i in self.indicies:
+        for i in self.indices:
             self[i] = other * self[i]
 
     # ------------------------------------------------------
@@ -116,21 +116,22 @@ class Vector:
     def append(self, element):
         self.list.append(element)
         # we also have to update indicies
-        self.indicies = range(1, len(self) + 1)
+        self.indices = range(1, len(self) + 1)
 
     def prepend(self, element):
         self.list.insert(0, element)
-        self.indicies = range(1, len(self) + 1)
+        self.indices = range(1, len(self) + 1)
 
     # these following two methods allow our vector to be base
     # one rather than base zero
     def __setitem__(self, key, value):
         # this is to create the appropriate behavior for matrices
-        if not key:
+        if not key and key != 0:
             if len(value) != len(self):
                 raise Issue('length of row and number of columns differ')
-            for i in self.indicies:
+            for i in self.indices:
                 self[i] = value[i]
+            return
         if type(key) == int and key > 0:
             try:
                 self.list[key - 1] = value
@@ -142,7 +143,7 @@ class Vector:
     def __getitem__(self, key):
         # this is convenience for matrices later. If we try
         # self[None] we just get self
-        if not key:
+        if not key and key != 0:
             return self
         if type(key) == int and key > 0:
             try:
@@ -159,7 +160,7 @@ class Vector:
     def __eq__(self, other):
         if len(self) != len(other):
             return False
-        for i in self.indicies:
+        for i in self.indices:
             if self[i] != other[i]:
                 return False
         return True
@@ -167,10 +168,16 @@ class Vector:
     # means that the string is <value1, value2, value3, ...>
     def __str__(self):
         string = '<'
-        for i in self.indicies:
+        for i in self.indices:
             string += '%s, ' % self[i]
-        string = string[:-2] + '>'
+        if len(string) > 3:
+            string = string[:-2] + '>'
+        else:
+            string = string + '>'
         return string
+
+    def __repr__(self):
+        return str(self)
 
     # hashes based on the string representation
     def __hash__(self):
@@ -184,7 +191,7 @@ class ColumnSlice:
         self.rows = rows
         self.index_to_slice = index_to_slice
         self.current_index = 1
-        self.indicies = range(1, len(self.rows) + 1)
+        self.indices = range(1, len(self.rows) + 1)
 
     # iterations ---------------------------------------------
     def __iter__(self):
@@ -193,7 +200,7 @@ class ColumnSlice:
     def next(self):
         # if we have are trying to access at an index beyond
         # the length we need to stop
-        if self.current > len(self):
+        if self.current_index > len(self):
             # this allows us to iterate again
             self.current_index = 1
             raise StopIteration
@@ -212,7 +219,7 @@ class ColumnSlice:
     def __getitem__(self, key):
         if type(key) == int and key > 0:
             try:
-                return self.rows[key][index_to_slice]
+                return self.rows[key][self.index_to_slice]
             except:
                 raise Issue('key was out of bounds')
         else:
@@ -233,7 +240,7 @@ class ColumnSlice:
     def __eq__(self, other):
         if len(self) != len(other):
             return False
-        for i in self.indicies:
+        for i in self.indices:
             if self[i] != other[i]:
                 return False
         return True
@@ -241,10 +248,13 @@ class ColumnSlice:
     # means that the string is <value1, value2, value3, ...>
     def __str__(self):
         string = '<'
-        for i in self.indicies:
+        for i in self.indices:
             string += '%s, ' % self[i]
         string = string[:-2] + '>'
         return string
+
+    def __repr__(self):
+        return str(self)
 
     # hashes based on the string representation
     def __hash__(self):
@@ -282,7 +292,7 @@ class RowWrapper:
     def __getitem__(self, key):
         if key > len(self.rows[1]) or key < 1:
             raise Issue('index is out of bounds')
-        return ColumnSlice(self.rows, index_to_slice)
+        return ColumnSlice(self.rows, key)
 
     # this would arise with a call like M[None][i] = vector
     # so we need to loop through the rows and set their
@@ -294,7 +304,7 @@ class RowWrapper:
         if key > len(self.rows[1]) or key < 1:
             raise Issue('index is out of bounds')
         # we loop through the rows and the value at the same time
-        for i in self.rows.indicies:
+        for i in self.rows.indices:
             self.rows[i][key] = value[i]
         # and we are all done!
 
@@ -302,7 +312,7 @@ class Matrix:
 
     def __init__(self, num_rows, num_cols):
         # the matrix will be n by m
-        self.size = (num_rows, num_cols)
+        self.size = [num_rows, num_cols]
         # the containers for our rows will need to
         # be base one. Vectors will work well
         # the actual rows will be of course vectors
@@ -313,7 +323,7 @@ class Matrix:
             self.rows.append(Vector(num_cols))
         # to help with iterations
         self.row_indices = range(1, num_rows + 1)
-        self.column_indicies = range(1, num_cols + 1)
+        self.column_indices = range(1, num_cols + 1)
         self.rowwrapper = RowWrapper(self.rows)
 
     # in accessing matrices you should always give M[i][j] where
@@ -333,62 +343,75 @@ class Matrix:
     # only ever see getitem because M[i][j] will return M[i], and then
     # only the object returned by M[i] will see set item on j
 
+    def __str__(self):
+        string = '('
+        for row in self.rows:
+            for element in row:
+                string += '%s, ' % element
+            string = string[:-1] + '\n'
+        string = string[:-1] + ')'
+        return string
+
+    def __repr__(self):
+        return str(self)
+
     # helper methods -------------------------------------------------
     def getTranspose(self):
         transpose = Matrix(self.size[1], self.size[0])
         # we are going to loop through each column
-        for i in self.column_indicies:
+        for i in self.column_indices:
             transpose[i][None] = self[None][i].createVector()
         return transpose
 
     def prependColumns(self, other):
         if self.size[0] != other.size[0]:
             raise Issue('your two matrices have different number of rows!')
-        for i in other.column_indicies:
+        for i in other.column_indices:
             for j in self.row_indices:
                 # we actually run through the columns backwards
                 self.rows[j].prepend(other[j][other.size[1] - i + 1])
         # now we just need to adjust the size and number of columns
         self.size[1] = self.size[1] + other.size[1]
-        self.column_indicies = range(1, self.size[1] + 1)
+        self.column_indices = range(1, self.size[1] + 1)
 
     def appendColumns(self, other):
         if self.size[0] != other.size[0]:
             raise Issue('your two matrices have different number of rows!')
-        for i in other.column_indicies:
+        for i in other.column_indices:
             for j in self.row_indices:
                 self.rows[j].append(other[j][i])
         # now we just need to adjust the size and number of columns
         self.size[1] = self.size[1] + other.size[1]
-        self.column_indicies = range(1, self.size[1] + 1)
+        self.column_indices = range(1, self.size[1] + 1)
 
     def prependRows(self, other):
         if self.size[1] != other.size[1]:
             raise Issue('your two matrices have different number of columns!')
-        for i in other.row_indicies:
+        for i in other.row_indices:
             # we actually run through the rows backwards
-            self.rows.prepend(other[other.size[0] - i + 1][None])
+            self.rows.prepend(deepcopy(other[other.size[0] - i + 1][None]))
         # now we just need to adjust the size and number of rows
         self.size[0] = self.size[0] + other.size[0]
-        self.row_indicies = range(1, self.size[0] + 1)
+        self.row_indices = range(1, self.size[0] + 1)
 
     def appendRows(self, other):
         if self.size[1] != other.size[1]:
             raise Issue('your two matrices have different number of columns!')
-        for i in other.row_indicies:
-            self.rows.append(other[i][None])
+        for i in other.row_indices:
+            self.rows.append(deepcopy(other[i][None]))
         # now we just need to adjust the size and number of rows
         self.size[0] = self.size[0] + other.size[0]
-        self.row_indicies = range(1, self.size[0] + 1)
+        self.row_indices = range(1, self.size[0] + 1)
 
     def negate(self):
-        for i in self.row_indicies:
-            for j in self.column_indicies:
+        for i in self.row_indices:
+            for j in self.column_indices:
                 matrix[i][j] = -1 * matrix[i][j]
 
 
+
 def identityMatrix(size):
-    matrix = Matrix(size, size):
+    matrix = Matrix(size, size)
     for i in range(1, size + 1):
         matrix[i][i] = Fraction(1,1)
     return matrix
