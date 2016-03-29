@@ -24,70 +24,142 @@ class Issue(Exception):
     def __str__(self):
         return 'ERROR: the problem was: %s' % self.problem
 
-class BaseOneList:
+class Vector:
 
-    def __init__(self, array=[]):
-        self.list = array
-        self.current = 1
+    # a base one list can be initialized with a
+    # size, if given it will make itself 'size' long
+    # and fill with zeros
+    def __init__(self, size=0):
+        # create the list
+        self.list = []
+        # make it the appropriate size
+        for i in range(0, size):
+            self.list.append(Fraction(0,1))
+        self.current_index = 1    # this is used for iterations
+        # useful for iterations using an index
+        # allows us to easily iterate over a base 1 vector
+        # whereas python has its iteration helpers built around
+        # base zero
+        self.indicies = range(1, len(self) + 1)
 
+    # iteration handling ----------------------------------
     def __iter__(self):
         return self
 
     def next(self):
-        if self.length() < self.current:
-            self.current = 1
+        # if we have are trying to access at an index beyond
+        # the length we need to stop
+        if self.current > len(self):
+            # this allows us to iterate again
+            self.current_index = 1
             raise StopIteration
+        # otherwise we grab the element at self.current_index
         else:
-            element = self[self.current]
-            self.current += 1
+            element = self[self.current_index]
+            # we get ready for the next call of next()
+            self.current_index += 1
             return element
+    # -----------------------------------------------------
 
+    # basic math operations -------------------------------
     def __sub__(self, other):
-        new_list = BaseOneList()
-        for i in range(1, self.length() + 1):
-            new_list.append(self[i] - other[i])
-        return new_list
+        if len(self) != len(other):
+            raise Issue('vectors are of different lengths')
+        new_vector = Vector()
+        for i in self.indicies:
+            new_vector.append(self[i] - other[i])
+        return new_vector
 
-    def __ad__(self, other):
-        new_list = BaseOneList()
-        for i in range(1, self.length() + 1):
-            new_list.append(self[i] + other[i])
-        return new_list
+    def __add__(self, other):
+        if len(self) != len(other):
+            raise Issue('vectors are of different lengths')
+        new_vector = Vector()
+        for i in self.indicies:
+            new_vector.append(self[i] + other[i])
+        return new_vector
+
+    # with rmul, the other is found before self, which is
+    # how scalar multiplication works
+    def __rmul__(self, other):
+        new_vector = Vector()
+        for i in self.indicies:
+            new_vector.append(other * self[i])
+        return new_vector
+    # ------------------------------------------------------
+
+    # in place math operations -----------------------------
+    # these operations will not return a new vector but rather
+    # modify the current one
+    def addOn(self, other):
+        if len(self) != len(other):
+            raise Issue('vectors are of different lengths')
+        for i in self.indicies:
+            self[i] = self[i] + other[i]
+
+    def subtractFrom(self, other):
+        if len(self) != len(other):
+            raise Issue('vectors are of different lengths')
+        for i in self.indicies:
+            self[i] = self[i] - other[i]
+
+    def scale(self, other):
+        for i in self.indicies:
+            self[i] = other * self[i]
+
+    # ------------------------------------------------------
+
+    # List like operations ---------------------------------
+    def __len__(self):
+        return len(self.list)
 
     def append(self, element):
         self.list.append(element)
+        # we also have to update indicies
+        self.indicies = range(1, len(self) + 1)
 
-    def length(self):
-        return len(self.list)
-
-    def __setitem__(self, key):
+    # these following two methods allow our vector to be base
+    # one rather than base zero
+    def __setitem__(self, key, value):
         if type(key) == int and key > 0:
             try:
-                self.list[key - 1] =
+                self.list[key - 1] = value
             except:
                 raise Issue('key was out of bounds')
         else:
-            raise Issue('key was not an integer')
+            raise Issue('key was not a positive integer')
 
-    def __getitem__(self, key, value):
+    def __getitem__(self, key):
         if type(key) == int and key > 0:
             try:
-                return self.list[key - 1] = value
+                return self.list[key - 1]
             except:
                 raise Issue('key was out of bounds')
         else:
-            raise Issue('key was not an integer')
+            raise Issue('key was not a positive integer')
 
+    # -----------------------------------------------------
+
+    # if two vectors have the same entries, the equals operation
+    # evaluates to True
     def __eq__(self, other):
-        if self.length() != other.length():
+        if len(self) != len(other):
             return False
         for i in range(1, self.length + 1):
             if self[i] != other[i]:
                 return False
         return True
 
+    # means that the string is <value1, value2, value3, ...>
     def __str__(self):
-        return str(self.list)
+        string = '<'
+        for i in self.indicies:
+            string += '%s, ' % self[i]
+        string = string[:-2] + '>'
+        return string
+
+    # hashes based on the string representation
+    def __hash__(self):
+        return hash(str(self))
 
 def createZeroBOL(self, size):
     BOL = BaseOneList()
