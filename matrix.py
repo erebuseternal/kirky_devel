@@ -121,6 +121,12 @@ class Vector:
     # these following two methods allow our vector to be base
     # one rather than base zero
     def __setitem__(self, key, value):
+        # this is to create the appropriate behavior for matrices
+        if not key:
+            if len(value) != len(self):
+                raise Issue('length of row and number of columns differ')
+            for i in self.indicies:
+                self[i] = value[i]
         if type(key) == int and key > 0:
             try:
                 self.list[key - 1] = value
@@ -248,31 +254,57 @@ class ColumnSlice:
         return vector
 
 # this is completely to allow for nice syntax on Matrices
+# it handles the cases of Matrix[None][i] and the getting
+# and setting that results. For getting it returns a column
+# slice, which acts pretty much like the vector (without
+# the math methods) but whose elements are embedded in the
+# rows. Therefore doing anything to them, affects the matrix
+# the rows came from.
+# for setting it loops through the rows setting the ith entry
+# of each to the approriate element from a column vector you
+# are trying to set.
 class RowWrapper:
 
     def __init__(self, rows):
         self.rows = rows
 
+    # when we have a matrix and we call M[None][1]
+    # M[None] returns a row wrapper and therefore
+    # this with a key of one would be called with
+    # M[None][1]. We need it to return a column
+    # slice which is like a vector except that its
+    # holding the rows, so that any modification to the
+    # column also affects the rows
     def __getitem__(self, key):
         if key > len(self.rows[1]) or key < 1:
             raise Issue('index is out of bounds')
         return ColumnSlice(self.rows, index_to_slice)
 
+    # this would arise with a call like M[None][i] = vector
+    # so we need to loop through the rows and set their
+    # ith element to the corresponding element in the vector
+    # where the vector should be like a column
+    def __setitem__(self, key, value):
+        if len(value) != len(self.rows):
+            raise Issue('length of column and number of rows differ')
+        if key > len(self.rows[1]) or key < 1:
+            raise Issue('index is out of bounds')
+        # we loop through the rows and the value at the same time
+        for i in self.rows.indicies:
+            self.rows[i][key] = value[i]
+        # and we are all done!
 
 class Matrix:
 
     def __init__(self, num_rows, num_cols):
         # the matrix will be n by m
         self.size = (num_rows, num_cols)
-        # the containers for our rows and columns will need to
+        # the containers for our rows will need to
         # be base one. Vectors will work well
-        # the actual rows and columns will of course be vectors
-        self.columns = Vector()
+        # the actual rows will be of course vectors
         self.rows = Vector()
-        # now we create the rows and columns, initializing all of
+        # now we create the rows initializing all of
         # their entries to zero (Fraction type)
-        for i in range(0, num_cols):
-            self.columns.append(Vector(num_rows))
         for i in range(0, num_rows):
             self.rows.append(Vector(num_cols))
         # to help with iterations
@@ -280,87 +312,18 @@ class Matrix:
         self.column_indicies = range(1, num_cols + 1)
 
     def __getitem__(self, key):
-        if
-        return self.rows[key]
-
-    # access ------------------------------------------------
-    # if we pass none in for the row or column key we will just
-    # get the column or the row respectively
-    def get(self, row_key, column_key):
-        # we are going to grab the column
-        if not row:
-            if type(column_key) == int and column_key > 0:
-                try:
-                    return self.columns[column_key]
-                except:
-                    raise Issue('column key was out of bounds')
-            else:
-                raise Issue('column key was not a positive integer')
+        if not key:
+            # here we return a RowWrapper to handle acces by column
+            return RowWrapper(self.rows)
         else:
-            # first we get the row we are looking at
-            if type(row_key) == int and row > 0:
-                try:
-                     row = self.rows[row_key]
-                except:
-                    raise Issue('row key was out of bounds')
-            else:
-                raise Issue('row key was not a positive integer')
-            # then, if the column key is None, we return the row
-            if not column:
-                return row
-            # otherwise we grab the particular element
-            else:
-                if type(column_key) == int and column_key > 0:
-                    try:
-                        return row[column_key]
-                    except:
-                        raise Issue('column key was out of bounds')
-                else:
-                    raise Issue('column key was not a positive integer')
-    # ---------------------------------------------------------------
+            if key > len(self.rows) or key < 1:
+                raise Issue('index is out of bounds')
+            # we just return the row
+            return self.rows[key]
 
-    # setting -------------------------------------------------------
-
-    def set(self, value, row_key, column_key):
-        # if both are not none we are setting a value
-        if row_key and columns_key:
-            if not type(row_key) == int:
-                raise Issue('row key was not an integer')
-            if not type(column_key) == int:
-                raise Issue('column key was not an integer')
-            if row_key > self.size[0] or row_key < 1:
-                raise Issue('row key was out of bounds')
-            if column_key > self.size[1] or column_key < 1:
-                raise Issue('column key was out of bounds')
-            # have to set things for both the rows and the columns
-            self.columns[column_key][row_key] = value
-            self.rows[row_key][column_key] = value
-        elif row_key:   # in this case we are seting a row
-            if not isinstance(row, BaseOneList):
-                raise Issue('row was not a child of BaseOneList')
-            if not type(row_key) == int:
-                raise Issue('row key was not an integer')
-            if row_key > self.size[0] or row_key < 1:
-                raise Issue('row key was out of bounds')
-            if not len(row) == self.size[1]:
-                raise Issue('row was of the wrong length')
-            # now we set the row
-            self.rows[row_key] = row
-            for i in range(0, self.size[1]):
-                self.setValue(row[i + 1], row_key, i + 1)
-        elif column_key:     # in this case we are setting a column
-            if not isinstance(column, BaseOneList):
-                raise Issue('column was not a child of BaseOneList')
-            if not type(column_key) == int:
-                raise Issue('column key was not an integer')
-            if column_key > self.size[1] or column_key < 1:
-                raise Issue('column key was out of bounds')
-            if not len(column) == self.size[0]:
-                raise Issue('column was of the wrong length')
-            # now we set the column
-            self.columns[column_key] = column
-            for i in range(0, self.size[0]):
-                self.setValue(column[i + 1], column_key, i + 1)
+    # we do not implement set item. This is because the matrix will
+    # only ever see getitem because M[i][j] will return M[i], and then
+    # only the object returned by M[i] will see set item on j
 
     def getTranspose(self):
         transpose = Matrix(self.size[1], self.size[0])
