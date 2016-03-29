@@ -118,6 +118,10 @@ class Vector:
         # we also have to update indicies
         self.indicies = range(1, len(self) + 1)
 
+    def prepend(self, element):
+        self.list.insert(0, element)
+        self.indicies = range(1, len(self) + 1)
+
     # these following two methods allow our vector to be base
     # one rather than base zero
     def __setitem__(self, key, value):
@@ -310,11 +314,15 @@ class Matrix:
         # to help with iterations
         self.row_indices = range(1, num_rows + 1)
         self.column_indicies = range(1, num_cols + 1)
+        self.rowwrapper = RowWrapper(self.rows)
 
+    # in accessing matrices you should always give M[i][j] where
+    # i or j can be None to indicate you want a column or row
+    # respectively
     def __getitem__(self, key):
         if not key:
             # here we return a RowWrapper to handle acces by column
-            return RowWrapper(self.rows)
+            return self.rowwrapper
         else:
             if key > len(self.rows) or key < 1:
                 raise Issue('index is out of bounds')
@@ -325,39 +333,62 @@ class Matrix:
     # only ever see getitem because M[i][j] will return M[i], and then
     # only the object returned by M[i] will see set item on j
 
+    # helper methods -------------------------------------------------
     def getTranspose(self):
         transpose = Matrix(self.size[1], self.size[0])
-        transpose.columns = self.rows
-        transpose.rows = self.columns
+        # we are going to loop through each column
+        for i in self.column_indicies:
+            transpose[i][None] = self[None][i].createVector()
         return transpose
 
+    def prependColumns(self, other):
+        if self.size[0] != other.size[0]:
+            raise Issue('your two matrices have different number of rows!')
+        for i in other.column_indicies:
+            for j in self.row_indices:
+                # we actually run through the columns backwards
+                self.rows[j].prepend(other[j][other.size[1] - i + 1])
+        # now we just need to adjust the size and number of columns
+        self.size[1] = self.size[1] + other.size[1]
+        self.column_indicies = range(1, self.size[1] + 1)
 
-def joinRows(matrix1, matrix2):
-    if matrix1.size[1] != matrix2.size[1]:
-        raise Issue('your two matrices have different number of columns!')
-    matrix = Matrix(matrix1.size[0] + matrix2.size[0], matrix1.size[1])
-    matrix.rows = matrix1.rows
-    for i in range(0, matrix2.size[0]):
-        matrix.rows.append(matrix2.rows[i + 1])
-    return matrix
+    def appendColumns(self, other):
+        if self.size[0] != other.size[0]:
+            raise Issue('your two matrices have different number of rows!')
+        for i in other.column_indicies:
+            for j in self.row_indices:
+                self.rows[j].append(other[j][i])
+        # now we just need to adjust the size and number of columns
+        self.size[1] = self.size[1] + other.size[1]
+        self.column_indicies = range(1, self.size[1] + 1)
 
-def joinColumns(matrix1, matrix2):
-    if matrix1.size[0] != matrix2.size[0]:
-        raise Issue('your two matrices have different number of rows!')
-    matrix = Matrix(matrix1.size[0], matrix1.size[1]+matrix2.size[1])
-    matrix.columns = matrix1.columns
-    for i in range(0, matrix2.size[1]):
-        matrix.columns.append(matrix2.columns[i + 1])
-    return matrix
+    def prependRows(self, other):
+        if self.size[1] != other.size[1]:
+            raise Issue('your two matrices have different number of columns!')
+        for i in other.row_indicies:
+            # we actually run through the rows backwards
+            self.rows.prepend(other[other.size[0] - i + 1][None])
+        # now we just need to adjust the size and number of rows
+        self.size[0] = self.size[0] + other.size[0]
+        self.row_indicies = range(1, self.size[0] + 1)
 
-def negateMatrix(matrix):
-    for i in range(1, matrix.size[0] + 1):
-        for j in range(1, matrix.size[1] + 1):
-            matrix.setValue(-1 * matrix.get(i, j), i, j)
-    return matrix
+    def appendRows(self, other):
+        if self.size[1] != other.size[1]:
+            raise Issue('your two matrices have different number of columns!')
+        for i in other.row_indicies:
+            self.rows.append(other[i][None])
+        # now we just need to adjust the size and number of rows
+        self.size[0] = self.size[0] + other.size[0]
+        self.row_indicies = range(1, self.size[0] + 1)
+
+    def negate(self):
+        for i in self.row_indicies:
+            for j in self.column_indicies:
+                matrix[i][j] = -1 * matrix[i][j]
+
 
 def identityMatrix(size):
     matrix = Matrix(size, size):
     for i in range(1, size + 1):
-        matrix.setValue(Fraction(1, 1), i, i)
+        matrix[i][i] = Fraction(1,1)
     return matrix
