@@ -1,30 +1,48 @@
 # the following function will take a conditions
 # matrix. It will then go ahead and create a base block
 from matrix import *
-from graphparts import *
+from kirky import *
+from copy import copy
 
 def createBaseBlock(conditions):
     # we need to get the max element of each column, this will
     # be the length of one dimension or side of our block
-    sides = BaseOneList()
-    for i in range(1, conditions.size[1]):
-        column = conditions.get(None, i)
+    sides = Vector()
+    for i in range(1, conditions.size[1] + 1):
+        column = conditions[None][i]
         max_elem = 0
         for element in column:
             if abs(element) > max_elem:
                 max_elem = abs(element)
         sides.append(max_elem)
     # now that we have our sides we can go ahead and create our block
-    block = Block(conditions.size[1])
+    block = Block(conditions.size[1], conditions.size[0] + conditions.size[1])
+    # we add a single vertex which is the origin, we will build from here
+    vertex = Vertex(Vector(conditions.size[1]))
+    block.vertex_index.addElement(vertex)
+    block.vertices.append(vertex)
     # we start by making the hyper cube we will use
-    for i in range(1, conditions.size[1]):
-        head = createZeroBol()
-        head[i] = Fraction(1,1)
-        edge = Edge(i, head, createZeroBOL()[])
-        block.addEdge(edge)
+    for i in range(1, conditions.size[1] + 1):
+        # first we create our new vector we will be
+        # adding on
+        vector = Vector(conditions.size[1])
+        vector[i] = Fraction(1,1)
+        # now we grab the blocks vertices
+        vertices = copy(block.vertices)
+        # now we shift the block by one in the ith dimension
+        block.shiftAndAdd(1,i)
+        # for each of the old vertices we add an edge going out from
+        # them of our new type
+        for vertex in vertices:
+            head = vertex.position + vector
+            tail = vertex.position
+            edge = Edge(head, tail,i)
+            block.addEdge(edge)
     # now we shift and add on the various sides
-    for i in range(1, conditions.size[1]):
-        for j in range(0, sides[i]):
+    for i in range(1, conditions.size[1] + 1):
+        # note that we add on one less number of sides than in sides. That's
+        # because by the above construction we already have one of those sides
+        for j in range(1, sides[i]):
             block.shiftAndAdd(1, i)
     # now we have our basic block
     return block
@@ -38,22 +56,26 @@ def createInteriorBlock(conditions, multiples, baseblock):
 
     Note none of the multiples can be negative
     """
-    interior = Block(conditions.size[1])
+    interior = Block(conditions.size[1], conditions.size[1] + conditions.size[0])
     for i in range(1, conditions.size[0] + 1):
         for vertex in baseblock.vertices:
             # first we add
-            desired_position = vertex.position + conditions.get(i,None)
+            desired_position = vertex.position + conditions[i][None]
             desired_vertex = baseblock.vertex_index.getElement(Vertex(desired_position))
             if desired_vertex:
-                edge = Edge(i, desired_position, vertex.position, multiples[i])
+                edge = Edge(desired_position, vertex.position + Vector(conditions.size[1]), i, multiples[i])
+                # I make sure they are paired to the vertices in the baseblock so
+                # I do not have to join later
                 edge.addVertex(vertex, False)
                 edge.addVertex(desired_vertex, True)
                 interior.addEdge(edge)
             # then we subtract
-            desired_position = vertex.position - conditions.get(i,None)
+            desired_position = vertex.position - conditions[i][None]
             desired_vertex = baseblock.vertex_index.getElement(Vertex(desired_position))
             if desired_vertex:
-                edge = Edge(i, vertex.position, desired_position, multiples[i])
+                edge = Edge(vertex.position + Vector(conditions.size[1]), desired_position, i, multiples[i])
+                # I make sure they are paired to the vertices in the baseblock so
+                # I do not have to join later
                 edge.addVertex(vertex, True)
                 edge.addVertex(desired_vertex, False)
                 interior.addEdge(edge)

@@ -221,7 +221,7 @@ class Block:
             edge.id = len(self.edges)
             self.edge_indexes[vector_id].addElement(edge)
         else:
-            edge = index_edge
+            return
         # we now check to see if the vertices are in our index already
         # and if so we reset the appropriate vertex on the edge
         index_vertex = self.vertex_index.getElement(head_vertex.position)
@@ -244,9 +244,11 @@ class Block:
         num = len(self.edges)
         for i in range(0,num):
             edge = self.edges[i]
-            new_edge = Edge(edge.head_position, edge.tail_position, edge.vector_id, edge.num_edges)
-            new_edge.head_position[dimension] += amount
-            new_edge.tail_position[dimension] += amount
+            new_edge_head = deepcopy(edge.head_position)
+            new_edge_head[dimension] += amount
+            new_edge_tail = deepcopy(edge.tail_position)
+            new_edge_tail[dimension] += amount
+            new_edge = Edge(new_edge_head,new_edge_tail, edge.vector_id, edge.num_edges)
             self.addEdge(new_edge)
 
     def ingest(self, block):

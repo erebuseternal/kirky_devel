@@ -169,7 +169,8 @@ class Vector:
     def __str__(self):
         string = '<'
         for i in self.indices:
-            string += '%s, ' % self[i]
+            new = str(self[i])
+            string = string + '%s, ' % new
         if len(string) > 3:
             string = string[:-2] + '>'
         else:

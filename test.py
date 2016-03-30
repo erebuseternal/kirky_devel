@@ -2,6 +2,7 @@
 from kirky import *
 from time import clock
 from random import randint
+from functions import *
 """
 v1 = Vector(3)
 for i in range(1,4):
@@ -70,6 +71,7 @@ for edge in edges:
 for i in range(0,10):
     b.addEdge(edge)
 """
+"""
 edges = []
 for i in range(0, 20000):
     v1 = Vector()
@@ -83,3 +85,22 @@ b = Block(5,5)
 for edge in edges:
     b.addEdge(edge)
 b.ingest(b)
+"""
+"""
+M = Matrix(4,3)
+M[1][1] = 1
+M[1][2] = 2
+M[2][1] = 3
+M[2][2] = 4
+M[3][1] = 5
+M[3][2] = 6
+M[4][1] = 1
+M[4][2] = 1
+M[4][3] = 1
+M[1][3] = 1
+M[2][3] = 1
+M[3][3] = 1
+print(M)
+b = createBaseBlock(M)
+print(len(b.edges))
+"""
