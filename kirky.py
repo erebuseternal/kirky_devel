@@ -189,6 +189,7 @@ class Block:
 
     def __init__(self, dimensions, num_vectors, r=2):
         self.edges = []
+		self.size = [0] * dimensions 	# used with shift
         self.vertices = []
         self.vertex_index = Index(r,0,dimensions)
         self.edge_indexes = []
@@ -238,6 +239,9 @@ class Block:
             new_edge_tail[dimension] += amount
             new_edge = Edge(new_edge_head,new_edge_tail, edge.vector_id, edge.num_edges)
             self.addEdge(new_edge)
+		self.size[dimension] += amount
+
+		
 			
 # the following function will take a conditions
 # matrix. It will then go ahead and create a base block
@@ -390,7 +394,7 @@ def createBlockConditionRows(vertex, num_edges_in_block, conditions):
 # note that we only need to call this on the base block, because it contains all the vertices the interior has
 # therefore when we take a cut of the base blocks vertices, we get the edges in the interior as well. base and 
 # interior reference the same vertices
-def createBlockConditions(block, conditions):
+def createBlockConditions(conditions, block):
 	num_edges_in_block = len(block.edges)
     count = 1
 	matrix_blocks = []
@@ -400,3 +404,19 @@ def createBlockConditions(block, conditions):
 	# and now we join the blocks
 	blockconditions = sparse(matrix_blocks)
     return rows
+
+# must be of form [IB]
+# this returns B.T
+def createConditions(input_matrix):
+	n = input_matrix.size[1]
+	m = input_matrix.size[0]
+	slices = []
+	# we grab the columns of B
+	for i in range(m, n):
+		slices.append([input_matrix[:,i]])
+	# we join the columns
+	new_matrix = matrix(slices)
+	return new_matrix.trans()
+	
+				
+	
