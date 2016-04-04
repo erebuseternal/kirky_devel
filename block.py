@@ -18,6 +18,10 @@ class Vertex:
         self.edges = []
 
     def addEdge(self, edge, head):
+        # this is to make sure we don't accidently duplicate edges in a cut
+        for edge_tuple in self.edges:
+            if edge == edge_tuple[1]:
+                return
         # we just add the boolean and the edge to the edges as a tuple
         self.edges.append((head,edge))
 
@@ -76,7 +80,7 @@ class Edge:
         # finally we add a position so that this can be indexed by position
         self.position = head
         # this will be used later to identify edges in a block condition matrix
-        self.block_id = None
+        self.id = None
 
     # let's you handle the whole operation right here
     def addVertex(self, vertex, head):
@@ -87,7 +91,7 @@ class Edge:
         vertex.addEdge(self, head)
 
     def __str__(self):
-        return '%s%s%s' % (self.vector_id, self.head_position, self.tail_position)
+        return 'id:%shead:%stail:%s' % (self.vector_id, self.head_position, self.tail_position)
 
     def __hash__(self):
         return hash(str(self))
@@ -197,6 +201,12 @@ class VertexPool:
     def __init__(self, dimensions, r=2):
         self.vertices = []
         self.index = Index(r,0,dimensions)
+        self.current_id = 0
+        
+    def getNewId(self):
+        id = self.current_id
+        self.current_id += 1
+        return id
 
 class Block:
 
@@ -229,7 +239,8 @@ class Block:
         index_edge = self.edge_indexes[vector_id].getElement(edge.position)
         if not index_edge:
             self.edges.append(edge)
-            edge.id = len(self.edges)
+            edge.id = self.vertex_pool.getNewId()   # this allow ids to be 
+            # spread across multiple blocks without repeats
             self.edge_indexes[vector_id].addElement(edge)
         else:
             return
