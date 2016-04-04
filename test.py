@@ -1,5 +1,6 @@
 from kirky import createBaseBlock, createInteriorBlock, createBlockConditions
 from cvxopt import matrix
+from solver import solve, getIncidenceMatrix
 
 def blockformation(elements, size):
     conditions = matrix(elements,size)
@@ -64,3 +65,7 @@ def blockconditions(elements, size, multiples):
 # block conditions tests
 #blockconditions([1,1,1,1], (2,2), [1,1])
 #blockconditions([1,1,1,1], (2,2), [2,1])
+
+def GetKirchhoffGraph(conditions, multiples):
+    weights, block, interior = solve(conditions, multiples)
+    return getIncidenceMatrix(weights, block)
