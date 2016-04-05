@@ -163,6 +163,7 @@ def createBlockConditionRows(vertex, num_edges_in_block, conditions, multiples):
 # interior reference the same vertices
 def createBlockConditions(conditions, multiples, block, interior):
     num_edges_in_block = len(block.edges) + len(interior.edges)
+    
     matrix_blocks = []
     for vertex in block.vertices:
         rows = createBlockConditionRows(vertex, num_edges_in_block, conditions, multiples)

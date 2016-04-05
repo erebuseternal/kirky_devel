@@ -1,9 +1,10 @@
 from cvxopt import matrix
+from numpy import array
 from kirky import *
 from kirky_linsolve import nullspace
 
 def trysolution(conditions, multiples, block, interior):
-	b_c = createBlockConditions(conditions, multiples, block, interior))
+	b_c = createBlockConditions(conditions, multiples, block, interior)
 	# now we check to see if it not over determines
 	if b_c.size[0] <= b_c.size[1]:
 		# now we try get the null space
@@ -55,24 +56,32 @@ def solve(conditions, multiples, num=None):
 
 # this converts our weights and vectors cuts to an incidence matrix
 def getIncidenceMatrix(weights, block):
-	row = 0
-	elements = []
-	I = []
-	J = []
+	rows = []
+	num_vectors = block.num_vectors
 	for vertex in block.vertices:
-		for edge_tuple in vertex:
-			edge = edge_tuple[0]
-			head = edge_tuple[1]
+		row = ['0'] * num_vectors
+		for edge_tuple in vertex.edges:
+			edge = edge_tuple[1]
+			head = edge_tuple[0]
 			vector_id = edge.vector_id
 			id = edge.id
 			element = weights[id]
 			if head:
-				element *= -1
-			elements.append(element)
-			I.append(row)
-			J.append(vector_id)
-		row += 1
-	m = matrix(elements,I,J)
+				string = '-%s' % element
+			else:
+				string = '+%s' % element
+			if row[vector_id] == '0':
+				row[vector_id] = string
+			else:
+				row[vector_id] += string
+			# we add in the zero vectors along this edge if it is 
+			# actually composed of many edges
+			if edge.num_edges > 1:
+				for i in range(0, edge.num_edges - 1):
+					zero_row = ['0'] * num_vectors
+					zero_row[vector_id] = '%s-%s' % (element, element)
+		rows.append(row)
+	m = array(rows)
 	return m
 
 

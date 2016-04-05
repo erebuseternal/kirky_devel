@@ -279,7 +279,7 @@ class Block:
         if dimension > self.dimensions:
             raise Issue('this dimension is outside of the dimensions of this block')
         num = len(self.edges)
-        new_block = Block(self.dimensions, self.num_vectors, self.vertex_pool, self.r)
+        new_block = Block(self.dimensions, self.num_vectors, None, self.r)
         for i in range(0,num):
             edge = self.edges[i]
             new_edge_head = deepcopy(edge.head_position)

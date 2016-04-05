@@ -4,9 +4,16 @@ from numpy.linalg import svd
 
 # this uses svd to get our null space
 def nullspace(M, atol=1e-13, rtol=0):
+    rows = []
+    for i in range(0, M.size[0]):
+        row = []
+        for j in range(0, M.size[1]):
+            row.append(M[i,j])
+        rows.append(row)
+    A = np.array(rows)
     # my modification
     # first we convert to numpy array
-    A = np.array(M)
+    #A = np.array(M)
     # Now their bit: http://scipy-cookbook.readthedocs.org/items/RankNullspace.html
     """Compute an approximate basis for the nullspace of A.
 

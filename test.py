@@ -69,3 +69,7 @@ def blockconditions(elements, size, multiples):
 def GetKirchhoffGraph(conditions, multiples):
     weights, block, interior = solve(conditions, multiples)
     return getIncidenceMatrix(weights, block)
+
+m = matrix([1,2,2,1], (2,2))
+multiples = [1,1]
+print(GetKirchhoffGraph(m, multiples))
