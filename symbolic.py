@@ -153,14 +153,16 @@ class Web:
         # this is a list that holds all of the nodes that got a double 
         # lock condition on them
         self.errors = []
-        self.nodes = []
+        # I don't keep track of the nodes in a list, because this would 
+        # mean that every node I create would be kept, whereas many of them
+        # for example when I am creating edges will simply be lost as they 
+        # are found to be unneeded
         
     # this just creates a new node, assigned to this web, with the appropriate
     # new id
     def CreateNode(self):
         node = Node(self, self.next_id)
         self.next_id += 1
-        self.nodes.append(node)
         return node
         
     def Lock(self, node, value):

@@ -1,4 +1,5 @@
 from symbolic import Web
+from issue import Issue
 
 """
 Each vertex has a vertex cut. If there are n vectors 
@@ -31,6 +32,56 @@ class Vertex:
     def __init__(self, position):
         self.position = position
         self.cut = []
+        # this holds for each corresponding entry in cut the key of the 
+        # group you should add an edges weight symbolic node to
+        self.cut_group_keys = []
+        # this lists elements will be lists of length two holding in their 
+        # first position the edge of the corresponding vector going out 
+        # (if it exists) and in the second the edge of the corresponding 
+        # vector coming in
+        self.edges = []
+    
+    # adding an edge will only go through if such an edge hasn't been added 
+    # therefore uniqueness of edges is kept true here therefore when creating 
+    # our block we need only create the edge, and then get the vertices at each 
+    # of its ends and go right ahead and add the edge. If the edge doesn't exist 
+    # it will be added, if not it will be just ignored
+    def addEdge(self, edge):
+        # first we get the vector_id
+        vector_id = edge.vector_id
+        # now we are going to do two things, make sure that the vertex does 
+        # touch the edge in some way, and that we don't already have an edge 
+        # of this type yet
+        if self.position == edge.tail_position:
+            if not self.edges[vector_id][0]:
+                # first we add the edge to edges
+                self.edges[vector_id][0] = edge
+                # next we attach its weight to the specific node in the cut
+                # with a positive value because this edge is leading out.
+                # we first make sure a key is there
+                if not self.cut_group_keys[vector_id]:
+                    self.cut_group_keys[vector_id] = self.cut[vector_id].CreateParentGroup()
+                multiplier = 1
+                parent = edge.weight
+                self.cut[vector_id].AddParent(self.cut_group_keys[vector_id], (parent, multiplier))
+                return True # this is to allow another object to know that the edge was accepted
+        elif self.position == edge.head_position:
+            if not self.edges[vector_id][1]:
+                # first we add the edge to edges
+                self.edges[vector_id][1] = edge
+                # next we attach its weight to the specific node in the cut
+                # with a negative value because this edge is leading in.
+                # we first make sure a key is there
+                if not self.cut_group_keys[vector_id]:
+                    self.cut_group_keys[vector_id] = self.cut[vector_id].CreateParentGroup()
+                multiplier = -1
+                parent = edge.weight
+                self.cut[vector_id].AddParent(self.cut_group_keys[vector_id], (parent, multiplier))
+                return True # this is to allow another object to know that the edge was accepted
+        else:
+            raise Issue('the edge you are adding onto this vertex does not touch the vertex')
+        return False # to show that the edge wasn't accepted
+                
 
     def __str__(self):
         return '%s' % self.position
@@ -153,6 +204,10 @@ class VertexPool:
         # going to be generating
         self.web = Web()
         
+        # this will hold the maximum values of position vector entries in a 
+        # particular dimension
+        self.size = [0] * self.dimension
+        
     def createCut(self):
         # here is where we create a new cut for a vertex
         # first we create a bunch of brand new symbolic nodes 
@@ -176,25 +231,26 @@ class VertexPool:
         # and our cut has been created!
         return cut
     
-    def addVertex(self, vertex):
-        # first we look to see if there is a vertex at this position 
-        # already in the index
-        index_vertex = self.index.getElement(vertex.position)
-        # and we only add this vertex if it isn't already there
-        if not index_vertex:
-            self.index.addElement(vertex)
-            return vertex
-        # otherwise we will return the indexed vertex
-        else:
-            return index_vertex
-    
-    def CreateVertex(self, position):
-        vertex = Vertex(position)
-        cut = self.createCut()
-        # now we are going to handle adding a vertex
+    # this will get or, if does not exist, create a vertex
+    def GetVertex(self, position):
         # note this makes sure we return the actual indexed vertex 
         # which is especially important if there is already one there
         # uniqueness is thus maintained at the level of creating vertices
         # it is impossible to create a vertex at the same position twice
-        vertex = self.addVertex(vertex)
-        return vertex
+        index_vertex = self.index.getElement(position)
+        if not index_vertex:
+            vertex = Vertex(position)
+            cut = self.createCut()
+            # we initialize the cut group keys
+            vertex.cut_group_keys = [None] * len(cut)
+            # we initialize edges
+            vertex.edges = [[None, None]] * len(cut)
+            # now we are going to handle adding a vertex
+            self.index.addElement(vertex)
+            # now we see if we need to adjust the any of the sizes
+            for i in range(0, len(position)):
+                if position[i] > self.size[i]:
+                    self.size[i] = position[i]
+            return vertex
+        else: 
+            return index_vertex
