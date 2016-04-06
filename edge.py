@@ -88,6 +88,9 @@ class Block:
     def Size(self):
         return self.vertex_pool.size
         
+    def Vertices(self):
+        return self.vertex_pool.vertices
+    
     # this creates a shifted block but adds it directly to this block
     def AddShift(self, amount, dimension):
         if dimension > self.dimensions:

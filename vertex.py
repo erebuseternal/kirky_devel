@@ -247,6 +247,7 @@ class VertexPool:
             vertex.edges = [[None, None]] * len(cut)
             # now we are going to handle adding a vertex
             self.index.addElement(vertex)
+            self.vertices.append(vertex)
             # now we see if we need to adjust the any of the sizes
             for i in range(0, len(position)):
                 if position[i] > self.size[i]:
@@ -254,3 +255,11 @@ class VertexPool:
             return vertex
         else: 
             return index_vertex
+        
+    def HasVertex(self, position):
+        # this will check to see if a vertex exists
+        index_vertex = self.index.getElement(position)
+        if index_vertex:
+            return True
+        else:
+            return False
