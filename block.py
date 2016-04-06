@@ -127,6 +127,9 @@ class SymbolicNumber:
         if other.symbolic == False:
             self.num_set_parents += 1
             self.checkIfSetByParents()
+        else:
+            if self.symbolic == False:
+                self.UnSet()
         
 
 # a vertex is just a position and a collection of edges where
