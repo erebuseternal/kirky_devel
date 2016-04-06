@@ -44,6 +44,7 @@ class Node:
             # and this allows the parent to add the child 
             # under the appropriate group number
             parent_tuple[0].addChild(key, self)
+        return key
             
     def AddParent(self, key, parent_tuple):
         self.parent_groups[key].append(parent_tuple)
