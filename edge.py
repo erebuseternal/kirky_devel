@@ -30,13 +30,13 @@ class Edge:
     # if it was redundant, we will get false knowing the edge is unnecessary
     # note that if it is redundant at the tail vertex it will be redundant at the 
     # other 
-    def addVertices(self, tail_vertex, head_vertex):
+    def AddVertices(self, tail_vertex, head_vertex):
         if tail_vertex.position != self.tail_position or head_vertex.position != self.head_position:
             raise Issue('one or both vertices do not touch edge')
         self.vertices[0] = tail_vertex
         self.vertices[1] = head_vertex
-        if tail_vertex.addEdge(self):
-            head_vertex.addEdge(self)
+        if tail_vertex.AddEdge(self):
+            head_vertex.AddEdge(self)
             return True # this lets us know the edge was accepted
         return False # let's us know the edge was rejected
 
@@ -76,7 +76,7 @@ class Block:
         # yet exist
         tail_vertex = self.vertex_pool.GetVertex(edge.tail_position)
         head_vertex = self.vertex_pool.GetVertex(edge.head_position)
-        if edge.addVertices(tail_vertex, head_vertex):
+        if edge.AddVertices(tail_vertex, head_vertex):
             # if the edge was accepted we add it to the block's list of edges
             self.edges.append(edge)
     

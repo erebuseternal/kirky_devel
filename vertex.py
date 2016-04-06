@@ -46,7 +46,7 @@ class Vertex:
     # our block we need only create the edge, and then get the vertices at each 
     # of its ends and go right ahead and add the edge. If the edge doesn't exist 
     # it will be added, if not it will be just ignored
-    def addEdge(self, edge):
+    def AddEdge(self, edge):
         # first we get the vector_id
         vector_id = edge.vector_id
         # now we are going to do two things, make sure that the vertex does 
@@ -131,7 +131,7 @@ class Index:
 
     # note that we are indexing by the position property of an element
     # which is a vector
-    def addElement(self, element):
+    def AddElement(self, element):
         # first we get the position vector
         position = element.position
         # we get the
@@ -160,7 +160,7 @@ class Index:
         else:
             current_list.append(element)
 
-    def getElement(self, position):
+    def GetElement(self, position):
         current_map = self.face
         count = 1
         for i in range(self.start_index, self.start_index + self.depth):
@@ -237,7 +237,7 @@ class VertexPool:
         # which is especially important if there is already one there
         # uniqueness is thus maintained at the level of creating vertices
         # it is impossible to create a vertex at the same position twice
-        index_vertex = self.index.getElement(position)
+        index_vertex = self.index.GetElement(position)
         if not index_vertex:
             vertex = Vertex(position)
             cut = self.createCut()
@@ -246,7 +246,7 @@ class VertexPool:
             # we initialize edges
             vertex.edges = [[None, None]] * len(cut)
             # now we are going to handle adding a vertex
-            self.index.addElement(vertex)
+            self.index.AddElement(vertex)
             self.vertices.append(vertex)
             # now we see if we need to adjust the any of the sizes
             for i in range(0, len(position)):
@@ -258,7 +258,7 @@ class VertexPool:
         
     def HasVertex(self, position):
         # this will check to see if a vertex exists
-        index_vertex = self.index.getElement(position)
+        index_vertex = self.index.GetElement(position)
         if index_vertex:
             return True
         else:

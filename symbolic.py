@@ -124,7 +124,7 @@ class Node:
             # but if they aren't something is wrong in our web so the web
             # needs to be told
             else:
-                self.web.handleDoubleLock(self, value)
+                self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
         # this is overly simple because most of the unlocking procedure 
@@ -190,7 +190,7 @@ class Web:
         # we return the last actuated node for convenience
         return last_data[0]
     
-    def handleDoubleLock(self, node, value):
+    def HandleDoubleLock(self, node, value):
         self.errors.append(node)
         
     def Unlock(self):
