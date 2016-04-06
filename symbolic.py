@@ -1,3 +1,12 @@
+from issue import Issue
+
+"""
+NOTE!!! because Nodes do not update lock information when say a parent is added
+(which would need to be the case if the parent was locked) you must create before
+you do any locking. Or better put, you can only create and add onto a web of 
+nodes if ALL of the nodes are unlocked.
+"""
+
 class Node:
     
     def __init__(self, web, id):
@@ -93,7 +102,7 @@ class Node:
         if not self.lock:
             self.value = value
             self.lock = True
-            self.web.AddLock(self, value)
+            self.web.addLock(self, value)
             # next we need to update the lock counts for its children
             self.updateLocksOnChildren(id_to_ignore)
             # now we need to see if this also locks any parents
@@ -114,7 +123,7 @@ class Node:
             # but if they aren't something is wrong in our web so the web
             # needs to be told
             else:
-                self.web.HandleDoubleLock(self, value)
+                self.web.handleDoubleLock(self, value)
             
     def Unlock(self):
         # this is overly simple because most of the unlocking procedure 
@@ -127,6 +136,64 @@ class Node:
         for key in self.children:
             for child in self.children[key]:
                 child.parent_group_locks[key] -= 1
+        
+                
+class Web:
+    
+    def __init__(self):
+        self.next_id = 0 
+        # this is a list containing the locks that were specifically 
+        # commanded. What is actually contained in each entry
+        # is a tuple, the first entry is the node that was locked by 
+        # command, the second entry is the list of locks that occured
+        # after that lock took place
+        # this data will allow us to roll back to the last actuated lock
+        self.locks = []
+        # this is a list that holds all of the nodes that got a double 
+        # lock condition on them
+        self.errors = []
+        self.nodes = []
+        
+    # this just creates a new node, assigned to this web, with the appropriate
+    # new id
+    def CreateNode(self):
+        node = Node(self, self.next_id)
+        self.next_id += 1
+        self.nodes.append(node)
+        return node
+        
+    def Lock(self, node, value):
+        if node.lock:
+            raise Issue('cannot lock an already locked node from web command!')
+        new_lock_data = (node, [])
+        self.locks.append(new_lock_data)
+        # and now we initiate the lock
+        node.Lock(value)
+        
+    def addLock(self, node, value):
+        # we add a new node into the current_lock data
+        self.locks[-1][2].append(node)
+        
+    def RollBack(self):
+        # first we empty errors NOTE THAT YOU SHOULD NOT KEEP GOING IF 
+        # ERRORS EXIST!!!!
+        self.errors = []
+        # we just have to unlock all the nodes in our last lock data set
+        for node in self.locks[-1][2]:
+            node.Unlock()
+        self.locks[-1][1].Unlock()
+        # and now we remove that lock data set
+        last_data = self.locks.pop(-1)
+        # we return the last actuated node for convenience
+        return last_data[0]
+    
+    def handleDoubleLock(self, node, value):
+        self.errors.append(node)
+        
+    def Unlock(self):
+        # this will rollback everything
+        while len(self.locks) > 0:
+            self.RollBack()
                 
     
         
