@@ -7,7 +7,7 @@ from vertex import VertexPool
 # matrix. It will then go ahead and create a base block
 
 # conditions should be the B part of [IB] transposed and should be cvxopt matrix
-def createBaseBlock(conditions):
+def createBaseBlock(conditions, B):
     # we need to get the max element of each column, this will
     # be the length of one dimension or side of our block
     sides = []
@@ -19,7 +19,7 @@ def createBaseBlock(conditions):
                 max_elem = abs(element)
         sides.append(max_elem)
     # now before we can start building the block, we need our vertex pool
-    vertex_pool = VertexPool(conditions.trans)
+    vertex_pool = VertexPool(B)
     # now that we have our sides and our vertex_pool we can go ahead and create our block
     block = Block(vertex_pool)
     # we add a single vertex which is the origin, and we will build from here

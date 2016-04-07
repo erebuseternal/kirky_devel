@@ -195,6 +195,7 @@ class VertexPool:
         # the dimension of our space is equal to the number of rows
         # in our condition_block
         self.dimension = self.condition_block.size[0]
+        self.cut_size = self.condition_block.size[0] + self.condition_block.size[1]
         
         # we prepare ourself for the vertices
         self.vertices = []

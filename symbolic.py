@@ -127,16 +127,17 @@ class Node:
                 self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
-        # this is overly simple because most of the unlocking procedure 
-        # will be handled by the web this node is in
-        self.lock = False
-        self.value = 0
-        # and now we need to decrement the lock counts on this node's children
-        # note that the actual unlocking of these children will be handled by 
-        # the web
-        for key in self.children:
-            for child in self.children[key]:
-                child.parent_group_locks[key] -= 1
+        if self.lock:
+            # this is overly simple because most of the unlocking procedure 
+            # will be handled by the web this node is in
+            self.lock = False
+            self.value = 0
+            # and now we need to decrement the lock counts on this node's children
+            # note that the actual unlocking of these children will be handled by 
+            # the web
+            for key in self.children:
+                for child in self.children[key]:
+                    child.parent_group_locks[key] -= 1
         
                 
 class Web:
@@ -197,6 +198,7 @@ class Web:
         # this will rollback everything
         while len(self.locks) > 0:
             self.RollBack()
+
                 
     
         
