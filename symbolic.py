@@ -192,7 +192,7 @@ class Web:
         return last_data[0]
     
     def HandleDoubleLock(self, node, value):
-        self.errors.append(node)
+        self.errors.append((node, value))
         
     def Unlock(self):
         # this will rollback everything

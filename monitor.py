@@ -53,7 +53,7 @@ class Kirchhoff:
                 for node in vertex.cut:
                     if node.lock and node.value == 0:
                         count += 1
-                if count > self.min_vectors:
+                if count > self.min_vectors and count != len(vertex.cut):
                     self.lockZero(vertex)
                     self.zero_locks[-1] += 1
         if self.zero_locks[-1] == 0:
@@ -96,11 +96,14 @@ class Kirchhoff:
             raise Issue('discrepency between # of values you input and # of dimensions')
         # now we scale this to the first independent we find in our cut
         scaling = 1
+        had_to_scale = False
         for i in len(self.dimension):
             if vertex.cut[i].lock:
                 if vertex.cut[i].value != 0 and independents[i] == 0:
                     raise Issue('non zero value in cut and zero value in independents')
                 scaling = vertex.cut[i] / independents[i]
+                if scaling != 1:
+                    had_to_scale = True
                 break
         for i in len(self.dimension):
             independents[i] *= scaling
@@ -109,13 +112,39 @@ class Kirchhoff:
                 if vertex.cut[i].value != independents[i]:
                     raise Issue('could not scale independents to match all locks in vector')
         # now we can lock
-        for i in len(self.dimension):
+        for i in range(0, self.dimension):
             self.web.Lock(vertex.cut[i], independents[i])
         self.independents.append(True)
         # now we lock zeros
         self.LockZeroes()
         if self.web.errors:
+            # first we want to check if the error has to do with a scaling problem
+            # in this cut because of course we haven't scaled to the dependents
+            # therefore we will grab the first lock in the dependents. If it is 
+            # not the problem we rollback, if it is we look to see if we had to scale
+            # if we did we roll back. If we didn't we rollback and try again
             self.RollbackIndependents()
+            if not had_to_scale:
+                # we get our first locked dependent node
+                node = None
+                index = 0
+                for i in range(self.dimension, len(vertex.cut)):
+                    index = i
+                    node = vertex.cut[i]
+                    if node.locked:
+                        break
+                if node:
+                    # we create a new vertex to see if this node is a problem
+                    cut = self.web.createCut()
+                    for i in len(self.dimenions):
+                        cut.Lock(independents[i])
+                    # now we can see if it is the problem
+                    if node.value != cut[index].value:
+                        # so it is the problem and so we scale
+                        scaling = node.value / cut[index].value
+                        for i in range(0, self.dimension):
+                            independents[i] *= scaling
+                        return self.TryLockIndependents(independents, vertex)
             return False
         else:
             return True
