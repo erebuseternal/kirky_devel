@@ -226,7 +226,7 @@ class VertexPool:
             group_key = node.CreateParentGroup()
             # now we go ahead and add the parents and their multiples
             for j in range(0, self.dimension):
-                multiplier = self.condition_block[i,j]
+                multiplier = self.condition_block[j,i]
                 parent = cut[j]
                 node.AddParent(group_key, (parent, multiplier))
             cut.append(node)

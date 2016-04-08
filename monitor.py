@@ -7,7 +7,7 @@ from pyx import canvas
 class Kirchhoff:
     
     def __init__(self, B, conditions, multiples, min_vectors):
-        self.block = createBaseBlock(B, conditions)
+        self.block = createBaseBlock(conditions, B)
         self.web = self.block.vertex_pool.web
         self.interior = createInteriorBlock(conditions, multiples, self.block)
         self.min_vectors = min_vectors

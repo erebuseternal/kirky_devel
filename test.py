@@ -37,8 +37,10 @@ c.writePDFfile("arrow")
 """
 
 
-m = matrix([2,-1,1,2], (2,2))
-multiples = [1,1]
+m = matrix([2,1,-1,2, 2, 2], (2,3))
+print(m)
+print(m.trans())
+multiples = [1,1,1]
 """
 block = createBaseBlock(m, m)
 c = canvas.canvas()
