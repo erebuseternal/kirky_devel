@@ -71,18 +71,18 @@ def createInteriorBlock(conditions, multiples, baseblock):
             for j in range(0, len(vertex.position)):
                 desired_position.append(vertex.position[j] + conditions[i,j])
             # now we want to see if there is a vertex at this position
-            has_vertex = baseblock.vertex_pool.HasElement(desired_position)
+            has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
             if has_vertex:
                 edge = interior.CreateEdge(desired_position, copy(vertex.position), i + conditions.size[1], multiples[i])
                 # I now add the edge and note it will add over the same vertex pool as the base block
-                interior.addEdge(edge)
+                interior.AddEdge(edge)
             # then we subtract
             desired_position = []
             for j in range(0, len(vertex.position)):
                 desired_position.append(vertex.position[j] - conditions[i,j])
             # now we want to see if there is a vertex at this position
-            has_vertex = baseblock.vertex_pool.HasElement(desired_position)
+            has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
             if has_vertex:
                 edge = interior.CreateEdge(copy(vertex.position), desired_position, i + conditions.size[1], multiples[i])
-                interior.addEdge(edge)
+                interior.AddEdge(edge)
     return interior

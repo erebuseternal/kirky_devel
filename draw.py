@@ -1,8 +1,9 @@
 from pyx import path, deco, text
+from copy import copy
 
 def DrawEdge(edge, canvas):
-    head = edge.head_position
-    tail = edge.tail_position
+    head = copy(edge.head_position)
+    tail = copy(edge.tail_position)
     reversed = False
     if tail[0] - head[0] > 0:
         reversed = True
@@ -14,8 +15,8 @@ def DrawEdge(edge, canvas):
     if edge.weight.lock:
         weight = edge.weight.value
         numerator = weight.numerator
-        if numerator == 0:
-            return
+        #if numerator == 0:
+        #    return
         denominator = weight.denominator
         string = '%s/%s' % (numerator, denominator)
     if not reversed:

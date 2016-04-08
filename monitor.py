@@ -1,6 +1,8 @@
 from kirky import createBaseBlock, createInteriorBlock
 from fractions import Fraction
 from issue import Issue
+from draw import DrawBlock
+from pyx import canvas
 
 class Kirchhoff:
     
@@ -17,9 +19,9 @@ class Kirchhoff:
     # this function will cause a replication along a specific dimension 
     # such as to duplicate along that direction
     def Grow(self, dimension):
-        self.unlock()
+        self.Unlock()
         # first we grab how far we are going to have to shift
-        amount = self.block.Size()[dimension]
+        amount = int(self.block.Size()[dimension])
         # now we shift the block by that amount
         self.block.AddShift(amount, dimension)
         # now we do the incremental shift and add for the interior
@@ -167,6 +169,13 @@ class Kirchhoff:
                 self.RollbackIndependents()
             return True
         return False
+    
+    def Draw(self, file):
+        c = canvas.canvas()
+        DrawBlock(self.block, c)
+        DrawBlock(self.interior, c)
+        c.writePDFfile(file)
+            
         
         
                 

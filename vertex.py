@@ -199,7 +199,7 @@ class VertexPool:
         
         # we prepare ourself for the vertices
         self.vertices = []
-        self.index = Index(r,0,self.dimensions)
+        self.index = Index(r,0,self.dimension)
         
         # we prepare the web of symbolic nodes that we are 
         # going to be generating
@@ -229,6 +229,7 @@ class VertexPool:
                 multiplier = self.condition_block[i,j]
                 parent = cut[j]
                 node.AddParent(group_key, (parent, multiplier))
+            cut.append(node)
         # and our cut has been created!
         return cut
     
@@ -242,10 +243,12 @@ class VertexPool:
         if not index_vertex:
             vertex = Vertex(position)
             cut = self.createCut()
+            vertex.cut = cut
             # we initialize the cut group keys
             vertex.cut_group_keys = [None] * len(cut)
             # we initialize edges
-            vertex.edges = [[None, None]] * len(cut)
+            for i in range(0, len(cut)):
+                vertex.edges.append([None, None])
             # now we are going to handle adding a vertex
             self.index.AddElement(vertex)
             self.vertices.append(vertex)

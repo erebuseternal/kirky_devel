@@ -1,8 +1,11 @@
-from draw import DrawEdge
+from draw import DrawEdge, DrawBlock
 from edge import Edge
 from symbolic import Node
 from fractions import Fraction
 from pyx import canvas
+from cvxopt import matrix
+from kirky import createBaseBlock, createInteriorBlock
+from monitor import Kirchhoff
 
 """
 e1 = Edge([1,1],[0,0],0)
@@ -32,3 +35,22 @@ DrawEdge(e4, c)
 DrawEdge(e5, c)
 c.writePDFfile("arrow")
 """
+
+
+m = matrix([2,-1,1,2], (2,2))
+multiples = [1,1]
+"""
+block = createBaseBlock(m, m)
+c = canvas.canvas()
+DrawBlock(block, c)
+interior = createInteriorBlock(m, multiples, block)
+DrawBlock(interior,c)
+c.writePDFfile('block')
+"""
+
+k = Kirchhoff(m,m.trans(),multiples,2)
+k.Grow(0)
+k.Grow(1)
+k.Draw('kirchhoff')
+
+

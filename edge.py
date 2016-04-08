@@ -17,7 +17,7 @@ class Edge:
         self.tail_position = tail
         # the first entry is the one at the tail, the second is the one at the
         # head
-        self.vertices = []
+        self.vertices = [None, None]
 
         # finally we add a position so that this can be indexed by position
         self.position = head
@@ -81,9 +81,10 @@ class Block:
             self.edges.append(edge)
     
     # this allows us to add a symbolic node as the weight of an edge
-    def CreateEdge(self, tail_position, head_position, vector_id, num_edges):
+    def CreateEdge(self, tail_position, head_position, vector_id, num_edges=1):
         edge = Edge(tail_position, head_position, vector_id, num_edges)
         edge.weight = self.vertex_pool.web.CreateNode()
+        return edge
         
     def Size(self):
         return self.vertex_pool.size
@@ -93,7 +94,7 @@ class Block:
     
     # this creates a shifted block but adds it directly to this block
     def AddShift(self, amount, dimension):
-        if dimension > self.dimensions:
+        if dimension > self.dimension:
             raise Issue('this dimension is outside of the dimensions of this block')
         num = len(self.edges)
         for i in range(0,num):
