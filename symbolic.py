@@ -48,6 +48,7 @@ class Node:
             
     def AddParent(self, key, parent_tuple):
         self.parent_groups[key].append(parent_tuple)
+        parent_tuple[0].addChild(key, self)
             
     def addChild(self, key, child):
         if not key in self.children:
@@ -69,6 +70,10 @@ class Node:
     # this will be called by lock to see if there are any parent groups 
     # with one unlocked parent. In which case that parent needs to get locked    
     def checkForGroupLocks(self):
+        # this is here because if the child is not locked, the even if only one 
+        # of its parents are not locked, it isn't locked so the group isn't either
+        if not self.lock:
+            return
         for key in self.parent_groups:
             if len(self.parent_groups[key]) - 1 == self.parent_group_locks[key]:
                 # we now create the value we will need to lock this to
@@ -79,7 +84,9 @@ class Node:
                     else:
                         unlocked_parent = parent_tuple[0]
                         multiplier = parent_tuple[1]
-                value = value / multiplier
+                # this way the sum of the parents times their multipliers 
+                # equals the value of this child
+                value = (self.value - value) / multiplier
                 # and now we go for the lock
                 # note that we let the lock know to ignore this one particular
                 # child
@@ -95,7 +102,7 @@ class Node:
                 if child.parent_group_locks[key] == len(child.parent_groups[key]):
                     # this is to make sure that the parent isn't spurned to lock by a child 
                     # and then causes a double lock on a child
-                    if id_to_ignore != child.id:
+                    if id_to_ignore != child.id or child.id == None:
                         child.parentLock(key)
     
     def Lock(self, value, id_to_ignore=None):
