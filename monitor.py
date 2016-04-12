@@ -111,7 +111,10 @@ class Kirchhoff:
                 count += 1
         return count        
     
-    def TryLockIndependents(self, independents, vertex):
+    def TryLockIndependents(self, independents, vertex_position):
+        vertex = self.GetVertex(vertex_position)
+        for i in range(0, len(independents)):
+            independents[i] = Fraction(independents[i])
         if len(independents) != self.dimension:
             raise Issue('discrepency between # of values you input and # of dimensions')
         # now we scale this to the first independent we find in our cut
@@ -121,7 +124,8 @@ class Kirchhoff:
             if vertex.cut[i].lock:
                 if vertex.cut[i].value != 0 and independents[i] == 0:
                     raise Issue('non zero value in cut and zero value in independents')
-                scaling = vertex.cut[i].value / independents[i]
+                if independents[i] != 0:
+                    scaling = vertex.cut[i].value / independents[i]
                 if scaling != 1:
                     had_to_scale = True
                 break
@@ -143,6 +147,11 @@ class Kirchhoff:
         self.independents.append(True)
         # now we lock zeros
         self.LockZeroes()
+        # we roll back if any negatives occured
+        if self.CheckForNegatives():
+            self.RollbackZeroes()
+            self.RollbackIndependents()
+            raise Issue('caused negative edge weights')
         if self.web.errors:
             # first we want to check if the error has to do with a scaling problem
             # in this cut because of course we haven't scaled to the dependents
@@ -175,6 +184,14 @@ class Kirchhoff:
             return False
         else:
             return True
+        
+    def CheckForNegatives(self):
+        for vertex in self.block.Vertices():
+            for edge_tuple in vertex.edges:
+                for edge in edge_tuple:
+                    if edge and edge.weight.lock:
+                        if edge.weight.value < 0:
+                            return True
         
     def RollbackZeroes(self):
         print('rolling back zeros')

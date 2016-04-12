@@ -81,7 +81,12 @@ class Vertex:
         else:
             raise Issue('the edge you are adding onto this vertex does not touch the vertex')
         return False # to show that the edge wasn't accepted
-                
+    
+    def IsLocked(self):
+        for node in self.cut:
+            if not node.lock:
+                return False
+        return True
 
     def __str__(self):
         return '%s' % self.position
