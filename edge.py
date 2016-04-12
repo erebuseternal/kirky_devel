@@ -67,6 +67,7 @@ class Block:
         self.vertex_pool = vertex_pool
         self.edges = []
         self.dimension = self.vertex_pool.dimension
+        self.num_vectors = 0
 
     # because all of the uniqueness constraints are dealt with at the 
     # vertex pool and vertex level we simply call addVertices on the edge

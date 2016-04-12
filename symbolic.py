@@ -131,6 +131,8 @@ class Node:
             # but if they aren't something is wrong in our web so the web
             # needs to be told
             else:
+                print(self.value)
+                print(self)
                 self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
@@ -183,16 +185,16 @@ class Web:
         
     def addLock(self, node, value):
         # we add a new node into the current_lock data
-        self.locks[-1][2].append(node)
+        self.locks[-1][1].append(node)
         
     def RollBack(self):
         # first we empty errors NOTE THAT YOU SHOULD NOT KEEP GOING IF 
         # ERRORS EXIST!!!!
         self.errors = []
         # we just have to unlock all the nodes in our last lock data set
-        for node in self.locks[-1][2]:
+        for node in self.locks[-1][1]:
             node.Unlock()
-        self.locks[-1][1].Unlock()
+        self.locks[-1][0].Unlock()
         # and now we remove that lock data set
         last_data = self.locks.pop(-1)
         # we return the last actuated node for convenience

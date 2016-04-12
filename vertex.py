@@ -59,7 +59,7 @@ class Vertex:
                 # next we attach its weight to the specific node in the cut
                 # with a positive value because this edge is leading out.
                 # we first make sure a key is there
-                if not self.cut_group_keys[vector_id]:
+                if not self.cut_group_keys[vector_id] and self.cut_group_keys[vector_id] != 0:
                     self.cut_group_keys[vector_id] = self.cut[vector_id].CreateParentGroup()
                 multiplier = 1
                 parent = edge.weight
@@ -72,7 +72,7 @@ class Vertex:
                 # next we attach its weight to the specific node in the cut
                 # with a negative value because this edge is leading in.
                 # we first make sure a key is there
-                if not self.cut_group_keys[vector_id]:
+                if not self.cut_group_keys[vector_id] and self.cut_group_keys[vector_id] != 0:
                     self.cut_group_keys[vector_id] = self.cut[vector_id].CreateParentGroup()
                 multiplier = -1
                 parent = edge.weight

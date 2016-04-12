@@ -22,6 +22,7 @@ def createBaseBlock(conditions, B):
     vertex_pool = VertexPool(B)
     # now that we have our sides and our vertex_pool we can go ahead and create our block
     block = Block(vertex_pool)
+    block.num_vectors = block.dimension + B.size[1]
     # we add a single vertex which is the origin, and we will build from here
     vertex = vertex_pool.GetVertex([Fraction(0,1)] * vertex_pool.dimension)
     # we start by making the 1 sided hyper cube we will use
@@ -64,6 +65,7 @@ def createInteriorBlock(conditions, multiples, baseblock):
     Note none of the multiples can be negative
     """
     interior = Block(baseblock.vertex_pool)
+    interior.num_vectors = baseblock.num_vectors
     for i in range(0, conditions.size[0]):
         for vertex in baseblock.Vertices():
             # first we add
