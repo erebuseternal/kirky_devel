@@ -10,6 +10,7 @@ nodes if ALL of the nodes are unlocked.
 class Node:
     
     def __init__(self, web, id):
+		self.kind = None
         # children will be held under the key they assign to this parent
         # this is so that when the parents let the children know they have 
         # locked, the children can quickly assign the lock to the appropriate
@@ -31,6 +32,7 @@ class Node:
         
         self.web = web
         self.id = id
+		self.weight_id = 0
         
     def CreateParentGroup(self, *parent_tuples):
         # we create the new parent group

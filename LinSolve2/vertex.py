@@ -220,12 +220,15 @@ class VertexPool:
         # to act as our independent first m entries in this cut
         cut = []
         for i in range(0, self.dimension):
-            cut.append(self.web.CreateNode())
+			node = self.web.CreateNode()
+			node.kind = 'vertex'
+            cut.append(node)
             
         # now we create the rest of the entries (which of course are conditioned
         # on the first m
         for i in range(0, self.condition_block.size[1]):
             node = self.web.CreateNode()
+			node.kind = 'vertex'
             # now we add in our conditions
             # we create the new parent group for these conditions
             group_key = node.CreateParentGroup()

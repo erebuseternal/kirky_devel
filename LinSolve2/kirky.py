@@ -250,12 +250,129 @@ class Kirchhoff:
         print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
         return matrix    
 
+    def GenerateLinearSystemEdgeOnly(self):
+        print('-->generating linear system')
+        start = clock()
+        """
+		We know for a fact that our nodes split into two different kinds:
+			edges and vertex cut entries
+		we also know that except for cuts with absolutely no entries that each cut 
+		is 'determined' by the edges that enter into it. Therefore we need only solve
+		for the edges as they contain all of the information about our final solution.
+		In order to get only edges in our final solution we will do the following.
+		When looping through our nodes like in the normal generate linear system function
+		whenever we encounter a cut-node we 'replace' it with the edges that comprise this.
+		That is, instead of placing its multiple where its id should go, we instead 
+		for each of its corresponding edges, we enter the edges multiplier times the 
+		multiplier of the node at the id of the edge (the weight id). Then for parent 
+		groups that are comprised of edges, unless the node is locked (in which case 
+		it is locked to zero and we place each edge weight's multipler at its id) we 
+		skip (this reduces the number of contraints). And that is how we generate the 
+		linear system only concerning edges.
+		"""
+        # first we need to generate the matrix that will hold our system
+        # to do this we need the number of rows and the length of each row
+        num_rows = self.FindNumRowsEdgeOnly()
+        num_nodes = len(self.block.edge_weights) # this is the length of each row
+        matrix = Matrix(num_rows, num_nodes, [0]*(num_rows * num_nodes))
+        # now that we have generated the matrix we need to add in the non-zero
+        # parts of each row. We will do this by looping through the vertices 
+        # and for every lock to zero or parent group updating a new row. We will
+        # keep track of the row we are on with the following counter
+        row = 0
+        for node in self.web.nodes:
+            # we skip things that are strictly edges
+            for key in node.parent_groups:
+                # now we check to make sure this isn't a edge_weight parent group
+                if node.parent_groups[key][0][0].kind == 'edge':
+                    if node.lock:	# in this case we need to lock the sum of these edges with the appropriate modifiers to zero
+                        for parent_tuple in node.parent_groups[key]:
+                            parent = parent_tuple[0]
+                            multiplier = parent_tuple[1]
+                            matrix[row, parent.weight_id] = multiplier
+                            row += 1
+                            # we are done with this parent group so we move onto the next one
+                            continue
+                    else:
+                        # otherwise we continue onto the next group
+                        continue
+                # now we deal with a parent group with parents of the 'vertex' kind 
+                for parent_tuple in node.parent_groups[key]:
+                    # now for each of these we need to replace them by their 
+                    # edge parents
+                    parent = parent_tuple[0]
+                    parent_multiplier = parent_tuple[1]
+                    # now we get the edges to replace it
+                    edge_parents = self.getEdgeParents(parent)
+                    # we now enter the edge weight info into our matrix
+                    for edge_tuple in edge_parents:
+                        if edge_tuple:
+                            weight = edge_tuple[0]
+                            multiplier = edge_tuple[1]
+                            matrix[row, weight.weight_id] = multiplier * parent_multiplier
+                # we increment because now we are done with that row
+                row += 1
+        end = clock()
+        print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
+        return matrix  
+    
+    def getEdgeParents(self, node):
+        # this gets the edge_weights that form the parent group of a node 
+        # returns a two tuple, with edge or None in each entry
+        parents = (None, None)
+        index = 0
+        for key in node.parent_groups:
+            # we check to see if this key represents an edge parent group
+            if not node.parent_groups[key][0][0].kind == 'edge':
+                continue
+            # okay we now know that this is the parent group with edges
+            for parent_tuple in node.parent_groups[key]:
+                edge_weight = parent_tuple[0]
+                multiplier = parent_tuple[1]
+                if index > 1:
+                    break
+                parents[index] = (edge_weight, multiplier)
+            index += 1
+            break
+        return parents
+    
+    def FindNumsRowEdgeOnly(self):
+        count = 0
+        for node in self.web.nodes:
+            # we skip things that are strictly edges
+            for key in node.parent_groups:
+                # now we check to make sure this isn't a edge_weight parent group
+                if node.parent_groups[key][0][0].kind == 'edge':
+                    if node.lock:    # in this case we need to lock the sum of these edges with the appropriate modifiers to zero
+                        for parent_tuple in node.parent_groups[key]:
+                            count += 1
+                            # we are done with this parent group so we move onto the next one
+                            continue
+                    else:
+                        # otherwise we continue onto the next group
+                        continue
+                count += 1
+        return count
+
     def Solve(self):
         # here we make a call to generate the linear system the we try to solve 
         # for its nullspace. We return whatever solution we find. For Sympy
         # if there is no solution what we return will be an empty list. So 
         # you can check for that
         M = self.GenerateLinearSystem()
+        print('-->looking for nullspace')
+        start = clock()
+        solution = M.nullspace()
+        end = clock()
+        print('-->nullspace found in %s seconds' % (end - start))
+        return solution
+    
+    def SolveEdgeOnly(self):
+        # here we make a call to generate the linear system the we try to solve 
+        # for its nullspace. We return whatever solution we find. For Sympy
+        # if there is no solution what we return will be an empty list. So 
+        # you can check for that
+        M = self.GenerateLinearSystemEdgeOnly()
         print('-->looking for nullspace')
         start = clock()
         solution = M.nullspace()
