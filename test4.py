@@ -30,6 +30,6 @@ def findKirchhoff(B,m,multiples,min_num,file):
     k.Draw(file)
     
 
-m = matrix([2,1,1,-1,3,-1], (2,3))
+m = matrix([1,1,1,-1], (2,2))
 print(m)
-findKirchhoff(m, m.T, [1,1,1], 3, 'kirchhoff4')
+findKirchhoff(m, m.T, [1,1], 2, 'kirchhoff5')

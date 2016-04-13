@@ -131,6 +131,8 @@ class Node:
             # but if they aren't something is wrong in our web so the web
             # needs to be told
             else:
+                print(self.value)
+                print(self)
                 self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
