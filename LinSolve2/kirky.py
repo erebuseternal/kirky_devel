@@ -251,7 +251,7 @@ class Kirchhoff:
         return matrix    
 
     def GenerateLinearSystemEdgeOnly(self):
-        print('-->generating linear system')
+        print('-->generating linear system (edge only)')
         start = clock()
         """
 		We know for a fact that our nodes split into two different kinds:
@@ -273,8 +273,8 @@ class Kirchhoff:
         # first we need to generate the matrix that will hold our system
         # to do this we need the number of rows and the length of each row
         num_rows = self.FindNumRowsEdgeOnly()
-        num_nodes = len(self.block.edge_weights) # this is the length of each row
-        matrix = Matrix(num_rows, num_nodes, [0]*(num_rows * num_nodes))
+        num_edges = len(self.block.edge_weights) # this is the length of each row
+        matrix = Matrix(num_rows, num_edges, [0]*(num_rows * num_edges))
         # now that we have generated the matrix we need to add in the non-zero
         # parts of each row. We will do this by looping through the vertices 
         # and for every lock to zero or parent group updating a new row. We will
@@ -313,7 +313,7 @@ class Kirchhoff:
                 # we increment because now we are done with that row
                 row += 1
         end = clock()
-        print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
+        print('-->generated linear system (edge system) of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
         return matrix  
     
     def getEdgeParents(self, node):

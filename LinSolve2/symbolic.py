@@ -32,9 +32,12 @@ class Node:
         
         self.web = web
         self.id = id
+        # this holds the weight id's for edges
 		self.weight_id = 0
         
     def CreateParentGroup(self, *parent_tuples):
+        # parent groups are how we show that several nodes should when combined 
+        # in a particular way equal this node
         # we create the new parent group
         key = self.next_key
         self.parent_groups[key] = []
@@ -72,6 +75,9 @@ class Node:
     # this will be called by lock to see if there are any parent groups 
     # with one unlocked parent. In which case that parent needs to get locked    
     def checkForGroupLocks(self):
+        # checking for group locks is looking to see if only one of the parents
+        # are not locked and the child is locked. In which case we know what 
+        # the one child is
         # this is here because if the child is not locked, the even if only one 
         # of its parents are not locked, it isn't locked so the group isn't either
         if not self.lock:
