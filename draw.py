@@ -14,11 +14,16 @@ def DrawEdge(edge, canvas):
     string = None
     if edge.weight.lock:
         weight = edge.weight.value
+        if weight == 0:
+            return
+        string = '%s' % weight
+        """
         numerator = weight.numerator
         #if numerator == 0:
         #    return
         denominator = weight.denominator
         string = '%s/%s' % (numerator, denominator)
+        """
     if not reversed:
         if string:
             canvas.stroke(path.line(tail[0], tail[1], head[0], head[1]), [deco.earrow, deco.curvedtext(string, textattrs=[text.vshift.mathaxis, text.size.tiny], exclude=0.1)])

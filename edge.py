@@ -80,6 +80,8 @@ class Block:
         if edge.AddVertices(tail_vertex, head_vertex):
             # if the edge was accepted we add it to the block's list of edges
             self.edges.append(edge)
+        else:
+            self.vertex_pool.web.RemoveNode()
     
     # this allows us to add a symbolic node as the weight of an edge
     def CreateEdge(self, tail_position, head_position, vector_id, num_edges=1):
