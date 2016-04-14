@@ -1,6 +1,6 @@
 from copy import copy
 from fractions import Fraction
-from edge import Block
+from edge import Block, EdgePool
 from vertex import VertexPool
 from pyx import canvas
 from draw import DrawBlock
@@ -25,8 +25,9 @@ def createBaseBlock(conditions, B):
         sides.append(max_elem)
     # now before we can start building the block, we need our vertex pool
     vertex_pool = VertexPool(B)
+    edge_pool = EdgePool()
     # now that we have our sides and our vertex_pool we can go ahead and create our block
-    block = Block(vertex_pool)
+    block = Block(vertex_pool, edge_pool)
     block.num_vectors = block.dimension + B.size[1]
     # we add a single vertex which is the origin, and we will build from here
     vertex = vertex_pool.GetVertex([Fraction(0,1)] * vertex_pool.dimension)
@@ -69,7 +70,7 @@ def createInteriorBlock(conditions, multiples, baseblock):
 
     Note none of the multiples can be negative
     """
-    interior = Block(baseblock.vertex_pool)
+    interior = Block(baseblock.vertex_pool, baseblock.edge_pool)
     interior.num_vectors = baseblock.num_vectors
     for i in range(0, conditions.size[0]):
         for vertex in baseblock.Vertices():
@@ -147,6 +148,23 @@ class Kirchhoff:
         end = clock()
         print('-->solution locked in %s seconds' % (end - start))
         
+    def LockSolutionEdgeOnly(self, solution, nullspace_vector_index=0):
+        print('-->locking solution (edges only)')
+        start = clock()
+        # this goes through and locks the edges 
+        nullspace_vector = solution[nullspace_vector_index]
+        for i in range(0, len(self.block.edge_pool.edge_weights)):
+            node = self.block.edge_pool.edge_weights[i]
+            value = nullspace_vector[i,0]
+            node.lock = True
+            node.value = value
+            """
+            if not node.lock:
+                self.web.Lock(node,value)
+            """
+        end = clock()
+        print('-->solution locked (edges only) in %s seconds' % (end - start))
+        
     def LockZeroes(self):
         print('-->locking zeroes')
         start = clock()
@@ -156,9 +174,9 @@ class Kirchhoff:
         # 2. we need to lock to zero any entry in a cut that has no edges 
         # corresponding to it at all
         for vertex in self.block.Vertices():
-            for i in range(0, len(vertex.edges)):
-                count = 0 # this will be used to determine how many zero entries
+            count = 0 # this will be used to determine how many zero entries
                             # there are in the cut
+            for i in range(0, len(vertex.edges)):
                 if not vertex.edges[i][0] and not vertex.edges[i][1]:
                     # if there are no edges corresponding to this cut
                     # we will attempt to lock to zero
@@ -170,12 +188,12 @@ class Kirchhoff:
                                 # another zero entry in the cut
             # now that we know how many entries in our cut are zero we can make 
             # sure that that doesn't leave us with too few spots to fill
-            if  self.min_vectors > self.block.num_vectors - count and count != len(vertex.cut):
-                    for i in range(0, len(vertex.edges)):
-                        if not vertex.cut[i].lock:
-                            self.web.Lock(vertex.cut[i], Fraction(0,1))
-                        else:
-                            pass
+            if self.min_vectors > self.block.num_vectors - count and count != len(vertex.cut):
+                for i in range(0, len(vertex.edges)):
+                    if not vertex.cut[i].lock:
+                        self.web.Lock(vertex.cut[i], Fraction(0,1))
+                    else:
+                        pass
         end = clock()
         print('-->zeroes locked in %s seconds' % (end - start))
         
@@ -273,7 +291,7 @@ class Kirchhoff:
         # first we need to generate the matrix that will hold our system
         # to do this we need the number of rows and the length of each row
         num_rows = self.FindNumRowsEdgeOnly()
-        num_edges = len(self.block.edge_weights) # this is the length of each row
+        num_edges = len(self.block.edge_pool.edge_weights) # this is the length of each row
         matrix = Matrix(num_rows, num_edges, [0]*(num_rows * num_edges))
         # now that we have generated the matrix we need to add in the non-zero
         # parts of each row. We will do this by looping through the vertices 
@@ -281,20 +299,19 @@ class Kirchhoff:
         # keep track of the row we are on with the following counter
         row = 0
         for node in self.web.nodes:
-            # we skip things that are strictly edges
+            edge_parents = self.getEdgeParents(node)
+            if node.lock and node.kind == 'vertex':
+                if edge_parents[1] or edge_parents[0]:
+                    for edge_tuple in edge_parents:
+                        if edge_tuple:
+                            weight = edge_tuple[0]
+                            multiplier = edge_tuple[1]
+                            matrix[row, weight.weight_id] += multiplier
+                    row += 1
             for key in node.parent_groups:
                 # now we check to make sure this isn't a edge_weight parent group
+                # because if it is we have already dealt with it
                 if node.parent_groups[key][0][0].kind == 'edge':
-                    if node.lock:	# in this case we need to lock the sum of these edges with the appropriate modifiers to zero
-                        for parent_tuple in node.parent_groups[key]:
-                            parent = parent_tuple[0]
-                            multiplier = parent_tuple[1]
-                            matrix[row, parent.weight_id] = multiplier
-                            row += 1
-                            # we are done with this parent group so we move onto the next one
-                            continue
-                    else:
-                        # otherwise we continue onto the next group
                         continue
                 # now we deal with a parent group with parents of the 'vertex' kind 
                 for parent_tuple in node.parent_groups[key]:
@@ -303,13 +320,20 @@ class Kirchhoff:
                     parent = parent_tuple[0]
                     parent_multiplier = parent_tuple[1]
                     # now we get the edges to replace it
-                    edge_parents = self.getEdgeParents(parent)
+                    parent_edge_parents = self.getEdgeParents(parent)
                     # we now enter the edge weight info into our matrix
+                    for edge_tuple in parent_edge_parents:
+                        if edge_tuple:
+                            weight = edge_tuple[0]
+                            multiplier = edge_tuple[1]
+                            matrix[row, weight.weight_id] += multiplier * parent_multiplier
+                    # finally we add in this node's parents with a minus 1 affixed to 
+                    # each of their multipliers
                     for edge_tuple in edge_parents:
                         if edge_tuple:
                             weight = edge_tuple[0]
                             multiplier = edge_tuple[1]
-                            matrix[row, weight.weight_id] = multiplier * parent_multiplier
+                            matrix[row, weight.weight_id] += multiplier * -1
                 # we increment because now we are done with that row
                 row += 1
         end = clock()
@@ -318,8 +342,8 @@ class Kirchhoff:
     
     def getEdgeParents(self, node):
         # this gets the edge_weights that form the parent group of a node 
-        # returns a two tuple, with edge or None in each entry
-        parents = (None, None)
+        # returns a two list, with edge or None in each entry
+        parents = [None, None]
         index = 0
         for key in node.parent_groups:
             # we check to see if this key represents an edge parent group
@@ -332,24 +356,21 @@ class Kirchhoff:
                 if index > 1:
                     break
                 parents[index] = (edge_weight, multiplier)
-            index += 1
+                index += 1
             break
         return parents
     
-    def FindNumsRowEdgeOnly(self):
+    def FindNumRowsEdgeOnly(self):
         count = 0
         for node in self.web.nodes:
+            edge_parents = self.getEdgeParents(node)
+            if node.lock:
+                if edge_parents[1] or edge_parents[0]:
+                    count += 1
             # we skip things that are strictly edges
             for key in node.parent_groups:
                 # now we check to make sure this isn't a edge_weight parent group
                 if node.parent_groups[key][0][0].kind == 'edge':
-                    if node.lock:    # in this case we need to lock the sum of these edges with the appropriate modifiers to zero
-                        for parent_tuple in node.parent_groups[key]:
-                            count += 1
-                            # we are done with this parent group so we move onto the next one
-                            continue
-                    else:
-                        # otherwise we continue onto the next group
                         continue
                 count += 1
         return count

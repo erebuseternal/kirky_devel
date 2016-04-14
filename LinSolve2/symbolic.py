@@ -10,7 +10,7 @@ nodes if ALL of the nodes are unlocked.
 class Node:
     
     def __init__(self, web, id):
-		self.kind = None
+        self.kind = None
         # children will be held under the key they assign to this parent
         # this is so that when the parents let the children know they have 
         # locked, the children can quickly assign the lock to the appropriate
@@ -33,7 +33,7 @@ class Node:
         self.web = web
         self.id = id
         # this holds the weight id's for edges
-		self.weight_id = 0
+        self.weight_id = 0
         
     def CreateParentGroup(self, *parent_tuples):
         # parent groups are how we show that several nodes should when combined 
@@ -139,8 +139,6 @@ class Node:
             # but if they aren't something is wrong in our web so the web
             # needs to be told
             else:
-                print(self.value)
-                print(self)
                 self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):

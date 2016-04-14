@@ -61,15 +61,30 @@ class Edge:
 # the following class handles creating, adding, and tracking edges 
 # over a vertex pool
 
+class EdgePool:
+    
+    def __init__(self):
+        self.edge_weights = []
+        self.current_id = 0
+        
+    # these two methods allow us to keep track of the edge weight nodes
+    def AddEdgeWeight(self, weight):
+        self.edge_weights.append(weight)
+        weight.weight_id = self.current_id
+        self.current_id += 1
+    
+    def RemoveEdgeWeight(self):
+        self.edge_weights.pop(-1)
+        self.current_id -= 1
+
 class Block:
 
-    def __init__(self, vertex_pool):
+    def __init__(self, vertex_pool, edge_pool):
         self.vertex_pool = vertex_pool
+        self.edge_pool = edge_pool
         self.edges = []
         self.dimension = self.vertex_pool.dimension
         self.num_vectors = 0
-        self.edges_weights = []
-        self.current_id = 0
 
     # because all of the uniqueness constraints are dealt with at the 
     # vertex pool and vertex level we simply call addVertices on the edge
@@ -83,7 +98,7 @@ class Block:
             # if the edge was accepted we add it to the block's list of edges
             self.edges.append(edge)
         else:
-            self.RemoveEdgeWeight()
+            self.edge_pool.RemoveEdgeWeight()
             self.vertex_pool.web.RemoveNode()
     
     # this allows us to add a symbolic node as the weight of an edge
@@ -91,18 +106,8 @@ class Block:
         edge = Edge(tail_position, head_position, vector_id, num_edges)
         edge.weight = self.vertex_pool.web.CreateNode()
         edge.weight.kind = 'edge'
-        self.AddEdgeWeight(edge.weight)
+        self.edge_pool.AddEdgeWeight(edge.weight)
         return edge
-
-    # these two methods allow us to keep track of the edge weight nodes
-    def AddEdgeWeight(self, weight):
-        self.edge_weights.append(weight)
-        weight.weight_id = self.current_id
-        self.current_id += 1
-    
-    def RemoveEdgeWeight(self):
-        self.edge_weights.pop(-1)
-        self.current_id -= 1
         
     def Size(self):
         return self.vertex_pool.size
