@@ -1,11 +1,11 @@
 from copy import copy
 from fractions import Fraction
-from edge import Block, EdgePool
-from vertex import VertexPool
+from .edge import Block, EdgePool
+from .vertex import VertexPool
 from pyx import canvas
-from draw import DrawBlock
+from .draw import DrawBlock
 from time import clock
-from issue import Issue
+from .issue import Issue
 from sympy import Matrix
 
 # the following function will take a conditions

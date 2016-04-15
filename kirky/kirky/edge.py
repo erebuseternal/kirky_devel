@@ -1,4 +1,4 @@
-from issue import Issue
+from .issue import Issue
 from copy import copy
 
 class Edge:

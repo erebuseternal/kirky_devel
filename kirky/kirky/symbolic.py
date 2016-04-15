@@ -1,4 +1,4 @@
-from issue import Issue
+from .issue import Issue
 
 """
 NOTE!!! because Nodes do not update lock information when say a parent is added

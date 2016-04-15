@@ -1,0 +1,4 @@
+To install: enter terminal, move into the kirky parent directory 
+that you downloaded, and run:
+
+    python setup.py install
