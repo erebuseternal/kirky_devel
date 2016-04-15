@@ -140,6 +140,19 @@ class Node:
             # needs to be told
             else:
                 self.web.HandleDoubleLock(self, value)
+                
+    def LockDown(self, value):
+        # this will lock this node and then only its children if they are ready
+        if not self.lock:
+            self.value = value
+            self.lock = True
+            self.web.addLock(self, value)
+            self.updateLocksOnChildren(None)
+        else:
+            if self.value == value:
+                return 
+            else:
+                self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
         if self.lock:
@@ -194,6 +207,14 @@ class Web:
         self.locks.append(new_lock_data)
         # and now we initiate the lock
         node.Lock(value)
+        
+    def LockDown(self, node, value):
+        if node.lock:
+            raise Issue('cannot lock an already locked node from web command')
+        new_lock_data = (node, [])
+        self.locks.append(new_lock_data)
+        # and now we initiate the lock
+        node.LockDown(value)
         
     def addLock(self, node, value):
         # we add a new node into the current_lock data

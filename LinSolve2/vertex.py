@@ -194,13 +194,13 @@ class Index:
 # vertices
 class VertexPool:
 
-    # condition block should be a cvxopt matrix it is the B portion of [IB]
+    # condition block should be a sympy matrix it is the B portion of [IB]
     def __init__(self, condition_block, r=2):
         self.condition_block = condition_block
         # the dimension of our space is equal to the number of rows
         # in our condition_block
-        self.dimension = self.condition_block.size[0]
-        self.cut_size = self.condition_block.size[0] + self.condition_block.size[1]
+        self.dimension = self.condition_block.shape[0]
+        self.cut_size = self.condition_block.shape[0] + self.condition_block.shape[1]
         
         # we prepare ourself for the vertices
         self.vertices = []
@@ -226,7 +226,7 @@ class VertexPool:
             
         # now we create the rest of the entries (which of course are conditioned
         # on the first m
-        for i in range(0, self.condition_block.size[1]):
+        for i in range(0, self.condition_block.shape[1]):
             node = self.web.CreateNode()
             node.kind = 'vertex'
             # now we add in our conditions

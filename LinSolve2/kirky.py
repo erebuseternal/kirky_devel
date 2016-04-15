@@ -11,12 +11,12 @@ from sympy import Matrix
 # the following function will take a conditions
 # matrix. It will then go ahead and create a base block
 
-# conditions should be the B part of [IB] transposed and should be cvxopt matrix
+# conditions should be the B part of [IB] transposed and should be sympy matrix
 def createBaseBlock(conditions, B):
     # we need to get the max element of each column, this will
     # be the length of one dimension or side of our block
     sides = []
-    for i in range(0, conditions.size[1]):
+    for i in range(0, conditions.shape[1]):
         column = conditions[:,i]
         max_elem = 0
         for element in column:
@@ -28,14 +28,14 @@ def createBaseBlock(conditions, B):
     edge_pool = EdgePool()
     # now that we have our sides and our vertex_pool we can go ahead and create our block
     block = Block(vertex_pool, edge_pool)
-    block.num_vectors = block.dimension + B.size[1]
+    block.num_vectors = block.dimension + B.shape[1]
     # we add a single vertex which is the origin, and we will build from here
     vertex = vertex_pool.GetVertex([Fraction(0,1)] * vertex_pool.dimension)
     # we start by making the 1 sided hyper cube we will use
-    for i in range(0, conditions.size[1]):
+    for i in range(0, conditions.shape[1]):
         # first we create our new vector we will be
         # adding on
-        vector = [Fraction(0,1)] * conditions.size[1]
+        vector = [Fraction(0,1)] * conditions.shape[1]
         vector[i] = Fraction(1,1)
         # now we grab the blocks vertices
         vertices = copy(block.Vertices())
@@ -45,7 +45,7 @@ def createBaseBlock(conditions, B):
         # them of our new type
         for vertex in vertices:
             head = []
-            for j in range(0, conditions.size[1]):
+            for j in range(0, conditions.shape[1]):
                 head.append(vertex.position[j] + vector[j])
             tail = copy(vertex.position)
             # now we create the edge that will go between these two positions
@@ -53,7 +53,7 @@ def createBaseBlock(conditions, B):
             # and we attempt to add it
             block.AddEdge(edge)
     # now we shift and add on the various sides
-    for i in range(0, conditions.size[1]):
+    for i in range(0, conditions.shape[1]):
         # note that we add on one less number of sides than in sides. That's
         # because by the above construction we already have one of those sides
         for j in range(1, sides[i]):
@@ -72,7 +72,7 @@ def createInteriorBlock(conditions, multiples, baseblock):
     """
     interior = Block(baseblock.vertex_pool, baseblock.edge_pool)
     interior.num_vectors = baseblock.num_vectors
-    for i in range(0, conditions.size[0]):
+    for i in range(0, conditions.shape[0]):
         for vertex in baseblock.Vertices():
             # first we add
             desired_position = []
@@ -81,7 +81,7 @@ def createInteriorBlock(conditions, multiples, baseblock):
             # now we want to see if there is a vertex at this position
             has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
             if has_vertex:
-                edge = interior.CreateEdge(desired_position, copy(vertex.position), i + conditions.size[1], multiples[i])
+                edge = interior.CreateEdge(desired_position, copy(vertex.position), i + conditions.shape[1], multiples[i])
                 # I now add the edge and note it will add over the same vertex pool as the base block
                 interior.AddEdge(edge)
             # then we subtract
@@ -91,7 +91,7 @@ def createInteriorBlock(conditions, multiples, baseblock):
             # now we want to see if there is a vertex at this position
             has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
             if has_vertex:
-                edge = interior.CreateEdge(copy(vertex.position), desired_position, i + conditions.size[1], multiples[i])
+                edge = interior.CreateEdge(copy(vertex.position), desired_position, i + conditions.shape[1], multiples[i])
                 interior.AddEdge(edge)
     return interior
 
@@ -104,6 +104,9 @@ class Kirchhoff:
         self.dimension = self.block.dimension
         # each entry will take the last number of zero locks
         self.independents = []
+        # stuff to do with solutions
+        self.solution = None
+        self.incidence_matrix = None
         
     # this function will cause a replication along a specific dimension 
     # such as to duplicate along that direction
@@ -156,12 +159,8 @@ class Kirchhoff:
         for i in range(0, len(self.block.edge_pool.edge_weights)):
             node = self.block.edge_pool.edge_weights[i]
             value = nullspace_vector[i,0]
-            node.lock = True
-            node.value = value
-            """
             if not node.lock:
-                self.web.Lock(node,value)
-            """
+                self.web.LockDown(node,value)
         end = clock()
         print('-->solution locked (edges only) in %s seconds' % (end - start))
         
@@ -408,3 +407,53 @@ class Kirchhoff:
         DrawBlock(self.block, c)
         DrawBlock(self.interior, c)
         c.writePDFfile(file)
+        
+    def GetIncidenceMatrix(self):
+        print('-->getting incidence matrix')
+        start = clock()
+        # this should only be called after a solution has been locked
+        # we are just going to run through the vertices
+        # and generate the incidence matrix. Note you can find their positions
+        # by grabbing the corresponding vertex simply by accessing it from 
+        # self.block.Vertices() at the 
+        # same index of the row you are looking at in the incidence matrix
+        # first we generate the matrix we will be using
+        num_cols = self.block.num_vectors
+        num_rows = len(self.block.Vertices())
+        M = Matrix(num_rows, num_cols, [0] * (num_rows * num_cols))
+        row = 0
+        for vertex in self.block.Vertices():
+            vector_id = 0
+            for node in vertex.cut:
+                M[row, vector_id] = node.value
+                vector_id += 1
+            row += 1
+        end = clock()
+        print('-->got incidence matrix in %s seconds' % (end - start))
+        return M
+                
+        
+    def Find(self, file):
+        # this runs the algorithm to find the kirchhoff graph for the entered 
+        # matrix
+        start = clock()
+        current = 0
+        while True:
+            self.LockZeroes()
+            solution = self.SolveEdgeOnly()
+            if not solution:
+                self.Unlock()
+                self.Grow(current)
+                if current == 0:
+                    current = 1
+                else:
+                    current = 0
+            else:
+                self.solution = solution
+                break
+        self.Unlock()
+        self.LockSolutionEdgeOnly(solution)
+        self.incidence_matrix = self.GetIncidenceMatrix()
+        self.Draw(file)
+        end = clock()
+        print('total time elapsed: %s seconds' % (end - start))
