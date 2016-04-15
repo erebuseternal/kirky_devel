@@ -433,7 +433,7 @@ class Kirchhoff:
         return M
                 
         
-    def Find(self, file):
+    def Find(self, file=None):
         # this runs the algorithm to find the kirchhoff graph for the entered 
         # matrix
         start = clock()
@@ -454,6 +454,7 @@ class Kirchhoff:
         self.Unlock()
         self.LockSolutionEdgeOnly(solution)
         self.incidence_matrix = self.GetIncidenceMatrix()
-        self.Draw(file)
+        if file:
+            self.Draw(file)
         end = clock()
         print('total time elapsed: %s seconds' % (end - start))
