@@ -71,6 +71,16 @@ class Node:
         # now that we have our value we see if this node is already locked 
         # we can attempt a lock
         self.Lock(value)
+        
+    def downParentLock(self, key):
+        # first we generate the value that this child will attempt to lock 
+        # to, because we need for both conditional statements to follow
+        value = 0
+        for parent_tuple in self.parent_groups[key]:
+            value += parent_tuple[1] * parent_tuple[0].value
+        # now that we have our value we see if this node is already locked 
+        # we can attempt a lock
+        self.LockDown(value)
     
     # this will be called by lock to see if there are any parent groups 
     # with one unlocked parent. In which case that parent needs to get locked    
@@ -102,7 +112,7 @@ class Node:
     
     # this updates the lock counts on the children and triggers a lock where 
     # necessary (avoiding a lock trigger on id_to_ignore)        
-    def updateLocksOnChildren(self, id_to_ignore):
+    def updateLocksOnChildren(self, id_to_ignore, down_lock=False):
         for key in self.children:
             for child in self.children[key]:
                 child.parent_group_locks[key] += 1
@@ -111,7 +121,10 @@ class Node:
                     # this is to make sure that the parent isn't spurned to lock by a child 
                     # and then causes a double lock on a child
                     if id_to_ignore != child.id or child.id == None:
-                        child.parentLock(key)
+                        if not down_lock:
+                            child.parentLock(key)
+                        else:
+                            child.downParentLock(key)
     
     def Lock(self, value, id_to_ignore=None):
         # if this is not already locked, we lock it
@@ -147,7 +160,7 @@ class Node:
             self.value = value
             self.lock = True
             self.web.addLock(self, value)
-            self.updateLocksOnChildren(None)
+            self.updateLocksOnChildren(None, True)
         else:
             if self.value == value:
                 return 

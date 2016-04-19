@@ -10,6 +10,6 @@ setup(name='kirky',
         packages=['kirky'],
         install_requires=[
             'sympy',
-            'pyx'
+            'pyx==0.12.1'
         ],
         zip_safe=False)
