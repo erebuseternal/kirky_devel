@@ -132,19 +132,6 @@ class Kirchhoff:
         
     def Unlock(self):
         self.web.Unlock()
-        
-    def LockSolution(self, solution, nullspace_vector_index=0):
-        print('-->locking solution (edges only)')
-        start = clock()
-        # this goes through and locks the edges 
-        nullspace_vector = solution[nullspace_vector_index]
-        for i in range(0, len(self.block.edge_pool.edge_weights)):
-            node = self.block.edge_pool.edge_weights[i]
-            value = nullspace_vector[i,0]
-            if not node.lock:
-                self.web.LockDown(node,value)
-        end = clock()
-        print('-->solution locked (edges only) in %s seconds' % (end - start))
     
     """
     when generating our linear system we consider the relations on the 
@@ -177,9 +164,38 @@ class Kirchhoff:
                         pass
         end = clock()
         print('-->zeroes locked in %s seconds' % (end - start))
+    
+    """
+    Once we have obtained a non-trivial null space for a specific block-size
+    we are going to want to lock the values we have found into the block so
+    that we can obtain our Kirchhoff Graph.
+    
+    The thing is that we may have more than one null space vector in our null
+    space. Therefore we have to make a selection - this is the meaning of the 
+    nullspace_vector_index. Whatever number you supply there will be the vector
+    chose (and it's all in base 0 of course). It defaults to 0, but if, for 
+    example you choose to enter 1 you will get the second vector if it exists.
+    If it doesn't exist get prepared for an error.
+    
+    Once a vector has been chosen, this method just runs through the edge weights
+    locking each one to its solution in the vector. And remember, because 
+    we based the order of the solution off of the order of the edge weights
+    in the edge pool this is pretty easy.
+    """
+    def LockSolution(self, nullspace_vector_index=0):
+        print('-->locking solution')
+        start = clock()
+        nullspace_vector = self.solution[nullspace_vector_index]
+        for i in range(0, len(self.block.edge_pool.edge_weights)):
+            node = self.block.edge_pool.edge_weights[i]
+            value = nullspace_vector[i,0]
+            if not node.lock:
+                self.web.Lock(node,value)
+        end = clock()
+        print('-->solution locked in %s seconds' % (end - start))
 
     def GenerateLinearSystem(self):
-        print('-->generating linear system (edge only)')
+        print('-->generating linear system')
         start = clock()
         """
 		We know for a fact that our nodes split into two different kinds:
@@ -247,7 +263,7 @@ class Kirchhoff:
                 # we increment because now we are done with that row
                 row += 1
         end = clock()
-        print('-->generated linear system (edge system) of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
+        print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
         return matrix  
     
     def getEdgeParents(self, node):
@@ -287,7 +303,7 @@ class Kirchhoff:
     
     def Solve(self):
         # here we make a call to generate the linear system the we try to solve 
-        # for its nullspace. We return whatever solution we find. For Sympy
+        # for its nullspace. We set whatever solution we find to self.solution. For Sympy
         # if there is no solution what we return will be an empty list. So 
         # you can check for that
         M = self.GenerateLinearSystem()
@@ -296,7 +312,7 @@ class Kirchhoff:
         solution = M.nullspace()
         end = clock()
         print('-->nullspace found in %s seconds' % (end - start))
-        return solution
+        self.solution = solution
                 
     def Draw(self, file):
         # this simply creates a canvas, draws the interior and exterior and 
@@ -338,8 +354,8 @@ class Kirchhoff:
         current = 0
         while True:
             self.LockZeroes()
-            solution = self.Solve()
-            if not solution:
+            self.Solve()
+            if not self.solution:
                 self.Unlock()
                 self.Grow(current)
                 if current == 0:
@@ -347,10 +363,9 @@ class Kirchhoff:
                 else:
                     current = 0
             else:
-                self.solution = solution
                 break
         self.Unlock()
-        self.LockSolution(solution)
+        self.LockSolution()
         self.incidence_matrix = self.GetIncidenceMatrix()
         if file:
             self.Draw(file)
