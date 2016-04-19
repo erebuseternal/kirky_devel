@@ -72,34 +72,6 @@ class Node:
         # we can attempt a lock
         self.Lock(value)
     
-    # this will be called by lock to see if there are any parent groups 
-    # with one unlocked parent. In which case that parent needs to get locked    
-    def checkForGroupLocks(self):
-        # checking for group locks is looking to see if only one of the parents
-        # are not locked and the child is locked. In which case we know what 
-        # the one child is
-        # this is here because if the child is not locked, the even if only one 
-        # of its parents are not locked, it isn't locked so the group isn't either
-        if not self.lock:
-            return
-        for key in self.parent_groups:
-            if len(self.parent_groups[key]) - 1 == self.parent_group_locks[key]:
-                # we now create the value we will need to lock this to
-                value = 0
-                for parent_tuple in self.parent_groups[key]:
-                    if parent_tuple[0].lock:
-                        value += parent_tuple[1] * parent_tuple[0].value 
-                    else:
-                        unlocked_parent = parent_tuple[0]
-                        multiplier = parent_tuple[1]
-                # this way the sum of the parents times their multipliers 
-                # equals the value of this child
-                value = (self.value - value) / multiplier
-                # and now we go for the lock
-                # note that we let the lock know to ignore this one particular
-                # child
-                unlocked_parent.Lock(value, self.id)
-    
     # this updates the lock counts on the children and triggers a lock where 
     # necessary (avoiding a lock trigger on id_to_ignore)        
     def updateLocksOnChildren(self, id_to_ignore):
