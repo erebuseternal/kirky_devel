@@ -7,6 +7,32 @@ from copy import copy
 # matrix. It will then go ahead and create a base block
 
 # conditions should be the B part of [IB] transposed and should be sympy matrix
+"""
+This function takes the conditions generated from scaling B^T so that it has all
+integer entries and B itself and generates the corresponding baseblock for them.
+
+It does so by first finding the max element in each column of the conditions.
+This determines the width of the block along each dimension. For example, the max
+element in the first column determines the width of the block in the first dimension.
+
+Then we create an edge pool, a vertex pool, and with these a block. We then create
+a vertex a the origin. 
+
+Next we create a cube of dimension equal to the number of rows of B by performing 
+the following iteration dimnesion times starting with that vertex at the origin:
+    create a copy the block so far one unit away from its 
+    current position in the direction of the current dimension.
+    join every vertex in the copied block with its corresponding vertex in the
+    'old' using an edge of length one in the direction of the dimension. this 
+    edge corresponds to the vector numbered by the current dimension.
+    Increment the dimension and repeat.
+    
+With that done we have created our basic cube. Now in order to finish our block
+we just shift and add along each dimension by one a number of times equal to the 
+max found in the corresponding column.
+
+Then we are done and return the block!  
+"""
 def createBaseBlock(conditions, B):
     # we need to get the max element of each column, this will
     # be the length of one dimension or side of our block
@@ -29,16 +55,18 @@ def createBaseBlock(conditions, B):
     # we start by making the 1 sided hyper cube we will use
     for i in range(0, conditions.shape[1]):
         # first we create our new vector we will be
-        # adding on
+        # adding onto each vertex's position
         vector = [Fraction(0,1)] * conditions.shape[1]
         vector[i] = Fraction(1,1)
-        # now we grab the blocks vertices
+        # now we grab the blocks vertices so we can run through only the 'old'
+        # ones after we've added the new
         vertices = copy(block.Vertices())
         # now we shift the block by one in the ith dimension
         block.AddShift(1,i)
         # for each of the old vertices we add an edge going out from
         # them of our new type
         for vertex in vertices:
+            # we create the new head position
             head = []
             for j in range(0, conditions.shape[1]):
                 head.append(vertex.position[j] + vector[j])
@@ -56,15 +84,28 @@ def createBaseBlock(conditions, B):
     # now we have our basic block
     return block
 
-def createInteriorBlock(conditions, multiples, baseblock):
-    """
-    For each condition, we need to loop through the vertices
-    in the baseblock and add and subtract to its position, the
-    position of the other side of our vector. If either exists we
-    create and add the appropriate vector.
+"""
+The interior block will contain all of the dependent vectors - the ones corresponding 
+to the columns of B. Now we know that for each such vector the corresponding 
+multiple of them (gotten from the scaling of B^T to get the conditions matrix)
+is equal to the dot product of the corresponding row of conditions and the column
+vector of independent vectors. But each of the independent vectors is just 1 
+along a specific dimension. Therefore the dot product between the two is computable
+and extremely easy to compute. 
 
-    Note none of the multiples can be negative
-    """
+So all we do to create the interior is run through the dependent vectors and for
+each do the following:
+    run through all of the vertices in the baseblock
+        for each vertex add the vector obtained in above manner to its position
+        and check to see if there is a vertex at this new position. If there is
+        add the edge between them.
+        do the same but subtract instead of add.
+        
+And that's it, we return the resulting block.
+
+NOTE: the vertex and edge pools of the interior and exterior are the same.
+"""
+def createInteriorBlock(conditions, multiples, baseblock):
     interior = Block(baseblock.vertex_pool, baseblock.edge_pool)
     interior.num_vectors = baseblock.num_vectors
     for i in range(0, conditions.shape[0]):
