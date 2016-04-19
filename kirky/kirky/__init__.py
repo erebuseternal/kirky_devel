@@ -132,26 +132,8 @@ class Kirchhoff:
         
     def Unlock(self):
         self.web.Unlock()
-    
-    def LockSolution(self, solution, nullspace_vector_index=0):
-        print('-->locking solution')
-        start = clock()
-        # this runs through the nodes and the solution at the same time 
-        # and locks each node to its entry in the solution 
-        # and it checks to make sure it can actually lock and that 
-        # the nodes themselves haven't locked things up already
-        # note that you can choose which null space vector to choose from 
-        # the nullspace solution but it defaults to the first
-        nullspace_vector = solution[nullspace_vector_index]
-        for i in range(0, len(self.web.nodes)):
-            node = self.web.nodes[i]
-            value = nullspace_vector[i,0]
-            if not node.lock:
-                self.web.Lock(node,value)
-        end = clock()
-        print('-->solution locked in %s seconds' % (end - start))
         
-    def LockSolutionEdgeOnly(self, solution, nullspace_vector_index=0):
+    def LockSolution(self, solution, nullspace_vector_index=0):
         print('-->locking solution (edges only)')
         start = clock()
         # this goes through and locks the edges 
@@ -163,20 +145,27 @@ class Kirchhoff:
                 self.web.LockDown(node,value)
         end = clock()
         print('-->solution locked (edges only) in %s seconds' % (end - start))
-        
+    
+    """
+    when generating our linear system we consider the relations on the 
+    cut itself and any edges underneath each portion of each vertex cut.
+    Note that we do not consider whether there are no edges underneath 
+    an entry in a vertex cut. What this means is that our linear system
+    could solve in such a way that the portion of the cut with no incident
+    edges could be non-zero. Obviously, this should be impossible, so 
+    here we are going to lock such entries in vertex cuts to zero. By
+    doing so we ensure that they cannot be non-zero in the solution of 
+    our system as this lock will be incorporated into the system we are 
+    going to solve. 
+    
+    This needs to be called each time before we attempt to generate the linear
+    system corresponding to a block.
+    
+    It needs to be undone by Unlock() each time we grow our block
+    """   
     def LockZeroes(self):
-        print('-->locking zeroes NEW')
+        print('-->locking zeroes')
         start = clock()
-        # when generating our linear system we consider the relations on the 
-        # cut itself and any edges underneath each portion of each vertex cut.
-        # Note that we do not consider whether there are no edges underneath 
-        # an entry in a vertex cut. What this means is that our linear system
-        # could solve in such a way that the portion of the cut with no incident
-        # edges could be non-zero. Obviously, this should be impossible, so 
-        # here we are going to lock such entries in vertex cuts to zero. By
-        # doing so we ensure that they cannot be non-zero in the solution of 
-        # our system as this lock will be incorporated into the system we are 
-        # going to solve.
         for vertex in self.block.Vertices():
             for i in range(0, len(vertex.edges)):
                 # we check to see if there is no edge of this type entering or 
@@ -188,79 +177,8 @@ class Kirchhoff:
                         pass
         end = clock()
         print('-->zeroes locked in %s seconds' % (end - start))
-        
-    def FindNumRows(self):
-        # this method will determine how many rows we need for our linear
-        # system's matrix. It counts how many parent groups there are across 
-        # the entire web of nodes plus however many nodes have been locked
-        # to zero by our LockZeroes Function
-        count = 0
-        for node in self.web.nodes:
-            if node.lock:
-                # this means it has been locked to zero
-                count += 1
-            for key in node.parent_groups:
-                count += 1
-        return count
-    
-    def GenerateLinearSystem(self):
-        print('-->generating linear system')
-        start = clock()
-        # our linear system for this block is composed in the following way.
-        # each of our nodes is a variable, therefore there needs to be a spot
-        # for each node in our solution. The entry's spot is determined by 
-        # the node's id. All nodes have unique and sequential ids so this works
-        # well. Each row of our linear system's matrix is generated in one of 
-        # two ways:
-        # 1. From a Parent Group
-        #    Here we place each parent's multiplier and the column position 
-        #    dictated by their id. Then we place a -1 at the column position 
-        #    dictated by the child's id. Seeing as we are saying this row 
-        #    multiplied with the solution must equal zero this is perfect.
-        # 2. From a node locked to zero
-        #    This is simple: the row is just a one at the column position 
-        #    which is the id of the node in question. This way we are setting
-        #    one times our node's value to equal zero. Which will mean our 
-        #    node will be set to zero as well. (Note that this is absolutely
-        #    required. Otherwise our linear system will solve for a cut and 
-        #    in the cut we will have a positive value corresponding to nothing
-        #    because in our Kirchhoff skeleton which composes the block there 
-        #    are no edges of this kind adjacent to the vertex this cut came 
-        #    from, our solution is true given the conditions on the cuts, 
-        #    but the cut's implication of edges is held in the skeleton, not 
-        #    the cuts themselves, and so if we do not add this information 
-        #    [by locking zeroes] we will get something inconsistent with what 
-        #    we actually want)
-        
-        # first we need to generate the matrix that will hold our system
-        # to do this we need the number of rows and the length of each row
-        num_rows = self.FindNumRows()
-        num_nodes = len(self.web.nodes) # this is the length of each row
-        matrix = Matrix(num_rows, num_nodes, [0]*(num_rows * num_nodes))
-        # now that we have generated the matrix we need to add in the non-zero
-        # parts of each row. We will do this by looping through the vertices 
-        # and for every lock to zero or parent group updating a new row. We will
-        # keep track of the row we are on with the following counter
-        row = 0
-        for node in self.web.nodes:
-            id = node.id
-            if node.lock:   # this means it has been locked to zero
-                matrix[row,id] = 1
-                # we increment because now we are done with that row
-                row += 1
-            for key in node.parent_groups:
-                matrix[row, id] = -1
-                for parent_tuple in node.parent_groups[key]:
-                    parent = parent_tuple[0]
-                    multiplier = parent_tuple[1]
-                    matrix[row, parent.id] = multiplier
-                # we increment because now we are done with that row
-                row += 1
-        end = clock()
-        print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
-        return matrix    
 
-    def GenerateLinearSystemEdgeOnly(self):
+    def GenerateLinearSystem(self):
         print('-->generating linear system (edge only)')
         start = clock()
         """
@@ -282,7 +200,7 @@ class Kirchhoff:
 		"""
         # first we need to generate the matrix that will hold our system
         # to do this we need the number of rows and the length of each row
-        num_rows = self.FindNumRowsEdgeOnly()
+        num_rows = self.FindNumRows()
         num_edges = len(self.block.edge_pool.edge_weights) # this is the length of each row
         matrix = Matrix(num_rows, num_edges, [0]*(num_rows * num_edges))
         # now that we have generated the matrix we need to add in the non-zero
@@ -352,7 +270,7 @@ class Kirchhoff:
             break
         return parents
     
-    def FindNumRowsEdgeOnly(self):
+    def FindNumRows(self):
         count = 0
         for node in self.web.nodes:
             edge_parents = self.getEdgeParents(node)
@@ -366,26 +284,13 @@ class Kirchhoff:
                         continue
                 count += 1
         return count
-
+    
     def Solve(self):
         # here we make a call to generate the linear system the we try to solve 
         # for its nullspace. We return whatever solution we find. For Sympy
         # if there is no solution what we return will be an empty list. So 
         # you can check for that
         M = self.GenerateLinearSystem()
-        print('-->looking for nullspace')
-        start = clock()
-        solution = M.nullspace()
-        end = clock()
-        print('-->nullspace found in %s seconds' % (end - start))
-        return solution
-    
-    def SolveEdgeOnly(self):
-        # here we make a call to generate the linear system the we try to solve 
-        # for its nullspace. We return whatever solution we find. For Sympy
-        # if there is no solution what we return will be an empty list. So 
-        # you can check for that
-        M = self.GenerateLinearSystemEdgeOnly()
         print('-->looking for nullspace')
         start = clock()
         solution = M.nullspace()
@@ -433,7 +338,7 @@ class Kirchhoff:
         current = 0
         while True:
             self.LockZeroes()
-            solution = self.SolveEdgeOnly()
+            solution = self.Solve()
             if not solution:
                 self.Unlock()
                 self.Grow(current)
@@ -445,7 +350,7 @@ class Kirchhoff:
                 self.solution = solution
                 break
         self.Unlock()
-        self.LockSolutionEdgeOnly(solution)
+        self.LockSolution(solution)
         self.incidence_matrix = self.GetIncidenceMatrix()
         if file:
             self.Draw(file)
