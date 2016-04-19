@@ -96,11 +96,10 @@ def createInteriorBlock(conditions, multiples, baseblock):
     return interior
 
 class Kirchhoff:
-    def __init__(self, B, conditions, multiples, min_vectors):
+    def __init__(self, B, conditions, multiples):
         self.block = createBaseBlock(conditions, B)
         self.web = self.block.vertex_pool.web
         self.interior = createInteriorBlock(conditions, multiples, self.block)
-        self.min_vectors = min_vectors
         self.dimension = self.block.dimension
         # each entry will take the last number of zero locks
         self.independents = []
