@@ -165,30 +165,23 @@ class Kirchhoff:
         print('-->solution locked (edges only) in %s seconds' % (end - start))
         
     def LockZeroes(self):
-        print('-->locking zeroes')
+        print('-->locking zeroes NEW')
         start = clock()
-        # 1. we need to lock zeros over an entire cut where there min_vectors 
-        # or less entries in the cut (where there is no entry if there are no 
-        # edges at all corresponding to that cut)
-        # 2. we need to lock to zero any entry in a cut that has no edges 
-        # corresponding to it at all
+        # when generating our linear system we consider the relations on the 
+        # cut itself and any edges underneath each portion of each vertex cut.
+        # Note that we do not consider whether there are no edges underneath 
+        # an entry in a vertex cut. What this means is that our linear system
+        # could solve in such a way that the portion of the cut with no incident
+        # edges could be non-zero. Obviously, this should be impossible, so 
+        # here we are going to lock such entries in vertex cuts to zero. By
+        # doing so we ensure that they cannot be non-zero in the solution of 
+        # our system as this lock will be incorporated into the system we are 
+        # going to solve.
         for vertex in self.block.Vertices():
-            count = 0 # this will be used to determine how many zero entries
-                            # there are in the cut
             for i in range(0, len(vertex.edges)):
+                # we check to see if there is no edge of this type entering or 
+                # exiting and attempt a lock if that is true
                 if not vertex.edges[i][0] and not vertex.edges[i][1]:
-                    # if there are no edges corresponding to this cut
-                    # we will attempt to lock to zero
-                    if not vertex.cut[i].lock:
-                        self.web.Lock(vertex.cut[i], Fraction(0,1))
-                    else:
-                        pass
-                    count += 1  # and we increment the count because we have found
-                                # another zero entry in the cut
-            # now that we know how many entries in our cut are zero we can make 
-            # sure that that doesn't leave us with too few spots to fill
-            if self.min_vectors > self.block.num_vectors - count and count != len(vertex.cut):
-                for i in range(0, len(vertex.edges)):
                     if not vertex.cut[i].lock:
                         self.web.Lock(vertex.cut[i], Fraction(0,1))
                     else:
