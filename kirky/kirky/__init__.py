@@ -1,99 +1,10 @@
-from copy import copy
 from fractions import Fraction
-from .edge import Block, EdgePool
-from .vertex import VertexPool
 from pyx import canvas
 from .draw import DrawBlock
 from time import clock
 from .issue import Issue
 from sympy import Matrix
-
-# the following function will take a conditions
-# matrix. It will then go ahead and create a base block
-
-# conditions should be the B part of [IB] transposed and should be sympy matrix
-def createBaseBlock(conditions, B):
-    # we need to get the max element of each column, this will
-    # be the length of one dimension or side of our block
-    sides = []
-    for i in range(0, conditions.shape[1]):
-        column = conditions[:,i]
-        max_elem = 0
-        for element in column:
-            if abs(element) > max_elem:
-                max_elem = abs(element)
-        sides.append(max_elem)
-    # now before we can start building the block, we need our vertex pool
-    vertex_pool = VertexPool(B)
-    edge_pool = EdgePool()
-    # now that we have our sides and our vertex_pool we can go ahead and create our block
-    block = Block(vertex_pool, edge_pool)
-    block.num_vectors = block.dimension + B.shape[1]
-    # we add a single vertex which is the origin, and we will build from here
-    vertex = vertex_pool.GetVertex([Fraction(0,1)] * vertex_pool.dimension)
-    # we start by making the 1 sided hyper cube we will use
-    for i in range(0, conditions.shape[1]):
-        # first we create our new vector we will be
-        # adding on
-        vector = [Fraction(0,1)] * conditions.shape[1]
-        vector[i] = Fraction(1,1)
-        # now we grab the blocks vertices
-        vertices = copy(block.Vertices())
-        # now we shift the block by one in the ith dimension
-        block.AddShift(1,i)
-        # for each of the old vertices we add an edge going out from
-        # them of our new type
-        for vertex in vertices:
-            head = []
-            for j in range(0, conditions.shape[1]):
-                head.append(vertex.position[j] + vector[j])
-            tail = copy(vertex.position)
-            # now we create the edge that will go between these two positions
-            edge = block.CreateEdge(head, tail,i)
-            # and we attempt to add it
-            block.AddEdge(edge)
-    # now we shift and add on the various sides
-    for i in range(0, conditions.shape[1]):
-        # note that we add on one less number of sides than in sides. That's
-        # because by the above construction we already have one of those sides
-        for j in range(1, sides[i]):
-            block.AddShift(1, i)
-    # now we have our basic block
-    return block
-
-def createInteriorBlock(conditions, multiples, baseblock):
-    """
-    For each condition, we need to loop through the vertices
-    in the baseblock and add and subtract to its position, the
-    position of the other side of our vector. If either exists we
-    create and add the appropriate vector.
-
-    Note none of the multiples can be negative
-    """
-    interior = Block(baseblock.vertex_pool, baseblock.edge_pool)
-    interior.num_vectors = baseblock.num_vectors
-    for i in range(0, conditions.shape[0]):
-        for vertex in baseblock.Vertices():
-            # first we add
-            desired_position = []
-            for j in range(0, len(vertex.position)):
-                desired_position.append(vertex.position[j] + conditions[i,j])
-            # now we want to see if there is a vertex at this position
-            has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
-            if has_vertex:
-                edge = interior.CreateEdge(desired_position, copy(vertex.position), i + conditions.shape[1], multiples[i])
-                # I now add the edge and note it will add over the same vertex pool as the base block
-                interior.AddEdge(edge)
-            # then we subtract
-            desired_position = []
-            for j in range(0, len(vertex.position)):
-                desired_position.append(vertex.position[j] - conditions[i,j])
-            # now we want to see if there is a vertex at this position
-            has_vertex = baseblock.vertex_pool.HasVertex(desired_position)
-            if has_vertex:
-                edge = interior.CreateEdge(copy(vertex.position), desired_position, i + conditions.shape[1], multiples[i])
-                interior.AddEdge(edge)
-    return interior
+from block_creation import createBaseBlock, createInteriorBlock
 
 class Kirchhoff:
     def __init__(self, B, conditions, multiples):
@@ -106,6 +17,7 @@ class Kirchhoff:
         # stuff to do with solutions
         self.solution = None
         self.incidence_matrix = None
+        self.linear_system = None
         
     # this function will cause a replication along a specific dimension 
     # such as to duplicate along that direction
@@ -131,38 +43,6 @@ class Kirchhoff:
         
     def Unlock(self):
         self.web.Unlock()
-    
-    """
-    when generating our linear system we consider the relations on the 
-    cut itself and any edges underneath each portion of each vertex cut.
-    Note that we do not consider whether there are no edges underneath 
-    an entry in a vertex cut. What this means is that our linear system
-    could solve in such a way that the portion of the cut with no incident
-    edges could be non-zero. Obviously, this should be impossible, so 
-    here we are going to lock such entries in vertex cuts to zero. By
-    doing so we ensure that they cannot be non-zero in the solution of 
-    our system as this lock will be incorporated into the system we are 
-    going to solve. 
-    
-    This needs to be called each time before we attempt to generate the linear
-    system corresponding to a block.
-    
-    It needs to be undone by Unlock() each time we grow our block
-    """   
-    def LockZeroes(self):
-        print('-->locking zeroes')
-        start = clock()
-        for vertex in self.block.Vertices():
-            for i in range(0, len(vertex.edges)):
-                # we check to see if there is no edge of this type entering or 
-                # exiting and attempt a lock if that is true
-                if not vertex.edges[i][0] and not vertex.edges[i][1]:
-                    if not vertex.cut[i].lock:
-                        self.web.Lock(vertex.cut[i], Fraction(0,1))
-                    else:
-                        pass
-        end = clock()
-        print('-->zeroes locked in %s seconds' % (end - start))
     
     """
     Once we have obtained a non-trivial null space for a specific block-size
@@ -192,7 +72,24 @@ class Kirchhoff:
                 self.web.Lock(node,value)
         end = clock()
         print('-->solution locked in %s seconds' % (end - start))
-
+    
+    """
+    We know that vertex cuts reduce to edges and that all of our conditions 
+    are based on vertex cuts. Therefore we can reduce the set of variables we 
+    need to consider down to just edge weights. 
+    
+    The following method then goes ahead and generates a matrix that contains
+    all of these conditions in such a form that this matrix M multiplied by 
+    a column containing the edge weights should equal zero. 
+    
+    How do we generate each of these rows of this matrix then? We follow the 
+    following algorithm:
+        * loop through every each of the symbolic nodes attached to our Kirchhoff object
+            * for each node check to see if it is locked (in which case we know it 
+                is locked to zero). If it is locked and is a vertex type node 
+                (i.e. a node representing an element of a vertex cut) then find 
+                the parent group containing an edge and grab all of 
+    """
     def GenerateLinearSystem(self):
         print('-->generating linear system')
         start = clock()
@@ -225,14 +122,6 @@ class Kirchhoff:
         row = 0
         for node in self.web.nodes:
             edge_parents = self.getEdgeParents(node)
-            if node.lock and node.kind == 'vertex':
-                if edge_parents[1] or edge_parents[0]:
-                    for edge_tuple in edge_parents:
-                        if edge_tuple:
-                            weight = edge_tuple[0]
-                            multiplier = edge_tuple[1]
-                            matrix[row, weight.weight_id] += multiplier
-                    row += 1
             for key in node.parent_groups:
                 # now we check to make sure this isn't a edge_weight parent group
                 # because if it is we have already dealt with it
@@ -263,7 +152,7 @@ class Kirchhoff:
                 row += 1
         end = clock()
         print('-->generated linear system of size (%s, %s) in %s seconds' % (matrix.shape[0], matrix.shape[1], (end-start)))
-        return matrix  
+        self.linear_system = matrix 
     
     def getEdgeParents(self, node):
         # this gets the edge_weights that form the parent group of a node 
@@ -300,15 +189,14 @@ class Kirchhoff:
                 count += 1
         return count
     
-    def Solve(self):
+    def SolveLinearSystem(self):
         # here we make a call to generate the linear system the we try to solve 
         # for its nullspace. We set whatever solution we find to self.solution. For Sympy
         # if there is no solution what we return will be an empty list. So 
         # you can check for that
-        M = self.GenerateLinearSystem()
         print('-->looking for nullspace')
         start = clock()
-        solution = M.nullspace()
+        solution = self.linear_system.nullspace()
         end = clock()
         print('-->nullspace found in %s seconds' % (end - start))
         self.solution = solution
@@ -352,10 +240,9 @@ class Kirchhoff:
         start = clock()
         current = 0
         while True:
-            self.LockZeroes()
-            self.Solve()
+            self.GenerateLinearSystem()
+            self.SolveLinearSystem()
             if not self.solution:
-                self.Unlock()
                 self.Grow(current)
                 if current == 0:
                     current = 1
@@ -363,7 +250,6 @@ class Kirchhoff:
                     current = 0
             else:
                 break
-        self.Unlock()
         self.LockSolution()
         self.incidence_matrix = self.GetIncidenceMatrix()
         if file:
