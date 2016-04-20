@@ -3,10 +3,6 @@ from .edge import Block, EdgePool
 from fractions import Fraction
 from copy import copy
 
-# the following function will take a conditions
-# matrix. It will then go ahead and create a base block
-
-# conditions should be the B part of [IB] transposed and should be sympy matrix
 """
 This function takes the conditions generated from scaling B^T so that it has all
 integer entries and B itself and generates the corresponding baseblock for them.
@@ -18,8 +14,8 @@ element in the first column determines the width of the block in the first dimen
 Then we create an edge pool, a vertex pool, and with these a block. We then create
 a vertex a the origin. 
 
-Next we create a cube of dimension equal to the number of rows of B by performing 
-the following iteration dimnesion times starting with that vertex at the origin:
+Next we create a unit cube of dimension equal to the number of rows of B by performing 
+the following iteration dimension times starting with that vertex at the origin:
     create a copy the block so far one unit away from its 
     current position in the direction of the current dimension.
     join every vertex in the copied block with its corresponding vertex in the

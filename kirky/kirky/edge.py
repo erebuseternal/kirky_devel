@@ -3,33 +3,32 @@ from copy import copy
 
 class Edge:
 
-    def __init__(self, head, tail, vector_id, num_edges=1):
+    def __init__(self, head, tail, vector_id, multiples=1):
         # the vector id is the index of the column that this vector was named
         # for
         self.vector_id = vector_id
         # this is the number of edges needed to complete the cycle this vector
         # is based off of (if any, remember 'basis edges' are selected by
         # the creator of the kirkhoff graph)
-        self.num_edges = num_edges
-        # these two methods check to make sure our head and tail are vectors
-        # and then add them on
+        self.num_edges = multiples
+        # these hold the head and tail positions of the edge
         self.head_position = head
         self.tail_position = tail
         # the first entry is the one at the tail, the second is the one at the
         # head
         self.vertices = [None, None]
-
         # finally we add a position so that this can be indexed by position
         self.position = head
-        # this will be assigned with something that has access to the web of 
-        # symbolic nodes
+        # this will hold the weight node, which will get assigned by the block
         self.weight = None
 
-    # this tries to add a vertex. If the edge is not redundant this function will 
-    # return True letting us know the vertex was added to the edge and visa versa
-    # if it was redundant, we will get false knowing the edge is unnecessary
-    # note that if it is redundant at the tail vertex it will be redundant at the 
-    # other 
+    """
+    this tries to add a vertex. If the edge is not redundant this function will 
+    return True letting us know the vertex was added to the edge and visa versa
+    if it was redundant, we will return false therefore indicating the edge is 
+    unnecessary note that if it is redundant at the tail vertex it will be 
+    redundant at the other 
+    """
     def AddVertices(self, tail_vertex, head_vertex):
         if tail_vertex.position != self.tail_position or head_vertex.position != self.head_position:
             raise Issue('one or both vertices do not touch edge')
@@ -57,10 +56,12 @@ class Edge:
         if self.vector_id != other.vector_id:
             return False
         return True
-    
-# the following class handles creating, adding, and tracking edges 
-# over a vertex pool
 
+"""    
+the following class handles creating, adding, and tracking edges 
+over a vertex pool. This allows us to keep collective state 
+about the edge weights
+"""
 class EdgePool:
     
     def __init__(self):
@@ -86,12 +87,17 @@ class Block:
         self.dimension = self.vertex_pool.dimension
         self.num_vectors = 0
 
-    # because all of the uniqueness constraints are dealt with at the 
-    # vertex pool and vertex level we simply call addVertices on the edge
-    # inputing the vertices we grab from the pool
+    """
+    This method will attempt to add an edge. It will succeed if the edge it 
+    is adding is not redundant.
+    If the action succeeds then we will append this edge to self.edges
+    If it does not succeed we do not just pass on but also remove the node
+    that represented the edge weight both from edge_weights and from the 
+    vertex pool's web
+    """
     def AddEdge(self, edge):
         # note these functions will create the vertices if they do not 
-        # yet exist
+        # yet exist. This is important for shift and add
         tail_vertex = self.vertex_pool.GetVertex(edge.tail_position)
         head_vertex = self.vertex_pool.GetVertex(edge.head_position)
         if edge.AddVertices(tail_vertex, head_vertex):
@@ -101,7 +107,11 @@ class Block:
             self.edge_pool.RemoveEdgeWeight()
             self.vertex_pool.web.RemoveNode()
     
-    # this allows us to add a symbolic node as the weight of an edge
+    """
+    We use this to create an edge because this handles not only calling the 
+    constructor for the edge, but creating a node for the edge weight and 
+    registering it with edge_weights. 
+    """
     def CreateEdge(self, tail_position, head_position, vector_id, num_edges=1):
         edge = Edge(tail_position, head_position, vector_id, num_edges)
         edge.weight = self.vertex_pool.web.CreateNode()
@@ -115,7 +125,14 @@ class Block:
     def Vertices(self):
         return self.vertex_pool.vertices
     
-    # this creates a shifted block but adds it directly to this block
+    """
+    This creates a copy of each edge in the block shifted by the input amount 
+    in the direction of the input dimension and attempts to add each 
+    into the block (creating vertices where needed through the implementation of 
+    AddEdge). Thus this essentially creates a copy of the block and adds the block
+    and this copy together without ever duplicating an edge (because AddEdge 
+    will not add an edge if doing so we cause a duplicate)  
+    """
     def AddShift(self, amount, dimension):
         if dimension > self.dimension:
             raise Issue('this dimension is outside of the dimensions of this block')

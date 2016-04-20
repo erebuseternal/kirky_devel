@@ -1,32 +1,6 @@
 from .symbolic import Web
 from .issue import Issue
 
-"""
-Each vertex has a vertex cut. If there are n vectors 
-in your block, then the vertex cut has n spots each of 
-which will end up being some number.
-
-From the conditions we actually know exactly how these things 
-need to be related, and thanks to symbolic nodes this becomes 
-super easy! 
-
-All we have to do is literally set some of the numbers in each cut 
-in terms of the others.
-
-Because of the form of the conditions we are going to be inputting this 
-becomes significantly easy: that form is [IB]. (mxn)
-
-From this form the first m entries are left alone. But, the ith entry (i>m)
-is equal to the sum of each of the first m entries each multiplied 
-by the corresponding element in the ith column.
-
-ith entry = sum([IB][j,i]*jth entry) j goes from 1 to m
-
-we can represent this very simply with our symbolic nodes,
-and vertex creation and all of this other jazz described can easily be handled
-by a vertex pool
-"""
-
 class Vertex:
 
     def __init__(self, position):
@@ -41,11 +15,22 @@ class Vertex:
         # vector coming in
         self.edges = []
     
-    # adding an edge will only go through if such an edge hasn't been added 
-    # therefore uniqueness of edges is kept true here therefore when creating 
-    # our block we need only create the edge, and then get the vertices at each 
-    # of its ends and go right ahead and add the edge. If the edge doesn't exist 
-    # it will be added, if not it will be just ignored
+    """
+    adding an edge will only go through if such an edge hasn't been added 
+    already. If the edge doesn't exist it will be added and its weight node 
+    added as parent to the corresponding entry in the cut (determined by 
+    vector id) with a multiplier of 1 if it is leaving the vertex and a 
+    multiplier of -1 if it is entering.
+    
+    Note that if this is the first edge of this vector id being added to the 
+    vertex, a new parent group will be created and its key kept in 
+    self.cut_group_keys. This key will be used to add a future edge weight 
+    corresponding to an edge of this vector id thereby making sure that 
+    all edge weights corresponding to the same vector id are added to the 
+    same parent group
+    
+    If the addition was successful, True is returned, if not False is returned
+    """
     def AddEdge(self, edge):
         # first we get the vector_id
         vector_id = edge.vector_id
@@ -190,8 +175,10 @@ class Index:
         # if we didn't find anything we return None
         return None
 
-# this is just a container really but it also handles the creation of new 
-# vertices
+"""
+This class handles the creation of new vertices and holds collective 
+state about them
+"""
 class VertexPool:
 
     # condition block should be a sympy matrix it is the B portion of [IB]
@@ -213,7 +200,32 @@ class VertexPool:
         # this will hold the maximum values of position vector entries in a 
         # particular dimension
         self.size = [0] * self.dimension
-        
+    
+    """
+    Each vertex has a vertex cut. If there are n vectors 
+    in your block, then the vertex cut has n spots each of 
+    which will end up being some number.
+
+    From the conditions we actually know exactly how these entries in each cut 
+    need to be related, and thanks to symbolic nodes this becomes 
+    super easy! 
+
+    All we have to do is make each entry of the cut a node and set some of the nodes 
+    in each cut in terms of the others.
+
+    Because of the form of the conditions ([IB] which is (mxn)) we are going to be 
+    inputting this becomes easy. From this form the first m entries in each cut are 
+    left alone. But, the ith entry (i>m) is equal to the sum of each of the first m 
+    entries each multiplied by the corresponding element in the ith column. I.e.
+
+    ith entry = sum([IB][j,i]*jth entry) where j goes from 1 to m
+
+    Therefore we can set the ith node in each cut to have a parent group 
+    where the parents are the first m nodes in the cut and the multipliers for 
+    the parent node representing the jth entry in the cut is [IB][j,i]. 
+    
+    And the following method creates lists of nodes just like this.
+    """  
     def createCut(self):
         # here is where we create a new cut for a vertex
         # first we create a bunch of brand new symbolic nodes 
@@ -241,12 +253,13 @@ class VertexPool:
         # and our cut has been created!
         return cut
     
-    # this will get or, if does not exist, create a vertex
+    """
+    this will get the currently indexed vertex or, if does not exist, create 
+    a new vertex and index it
+    
+    This is how new vertices should be created
+    """
     def GetVertex(self, position):
-        # note this makes sure we return the actual indexed vertex 
-        # which is especially important if there is already one there
-        # uniqueness is thus maintained at the level of creating vertices
-        # it is impossible to create a vertex at the same position twice
         index_vertex = self.index.GetElement(position)
         if not index_vertex:
             vertex = Vertex(position)
@@ -267,7 +280,9 @@ class VertexPool:
             return vertex
         else: 
             return index_vertex
-        
+    """
+    This looks to see if there is a vertex at the given position
+    """ 
     def HasVertex(self, position):
         # this will check to see if a vertex exists
         index_vertex = self.index.GetElement(position)

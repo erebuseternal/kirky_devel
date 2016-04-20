@@ -1,10 +1,19 @@
 from .issue import Issue
 
 """
-NOTE!!! because Nodes do not update lock information when say a parent is added
-(which would need to be the case if the parent was locked) you must create before
-you do any locking. Or better put, you can only create and add onto a web of 
-nodes if ALL of the nodes are unlocked.
+The basic idea of a node is the following. Each node can have a series of parent
+groups, and each parent can have a series of children (if a child has a parent
+that parent MUST have it as a child). Any node can then be locked. This happens
+in only one of two ways, either you lock it manually, or if all of a child's
+parents in one group get locked then it will get locked. How? well, each parent
+group is composed of tuples. Each tuple has for its first entry a node, and for 
+its second a multiplier (which should be a number). When all the parents are 
+locked they trigger the last child to lock to the sum of each of them multiplied
+by their multiplier. So if a child has two parents, one with a multiplier of 1
+and on with a multiplier of -1 then if the parents lock to the same value 
+the child will lock to zero.
+
+And that's essentially all there is to nodes
 """
 
 class Node:
@@ -30,6 +39,7 @@ class Node:
         
         self.lock = False
         
+        # this is the web the node is attached to
         self.web = web
         self.id = id
         # this holds the weight id's for edges
@@ -74,28 +84,31 @@ class Node:
     
     # this updates the lock counts on the children and triggers a lock where 
     # necessary (avoiding a lock trigger on id_to_ignore)        
-    def updateLocksOnChildren(self, id_to_ignore):
+    def updateLocksOnChildren(self):
         for key in self.children:
             for child in self.children[key]:
                 child.parent_group_locks[key] += 1
                 # then we need to see if a lock is triggered on the children
                 if child.parent_group_locks[key] == len(child.parent_groups[key]):
-                    # this is to make sure that the parent isn't spurned to lock by a child 
-                    # and then causes a double lock on a child
-                    if id_to_ignore != child.id or child.id == None:
-                        child.parentLock(key)
-                
+                    child.parentLock(key)
+    
+    # this is how you manually lock a node            
     def Lock(self, value):
-        # this will lock this node and then only its children if they are ready
+        # first we check to make sure that this isn't already locked
         if not self.lock:
             self.value = value
             self.lock = True
+            # we let the web node a lock has happened
             self.web.addLock(self, value)
-            self.updateLocksOnChildren(None)
+            # we update lock information on child nodes
+            self.updateLocksOnChildren()
         else:
+            # if it is already locked we check to see that the value we are 
+            # trying to lock to is the node's own value
             if self.value == value:
                 return 
             else:
+                # if it isn't we send invoke a method on the web
                 self.web.HandleDoubleLock(self, value)
             
     def Unlock(self):
@@ -111,7 +124,10 @@ class Node:
                 for child in self.children[key]:
                     child.parent_group_locks[key] -= 1
         
-                
+"""
+This class hold collective state about nodes and captures lock state 
+in such a way that we can rollback anything that we do in a consistent manner
+"""
 class Web:
     
     def __init__(self):
@@ -143,10 +159,15 @@ class Web:
     def RemoveNode(self):
         self.nodes.pop(-1)
         self.next_id -= 1
-        
+    
+    # this is how we should call a lock on a node. Calling it in this way 
+    # allows the web to keep enough state so that it can rollback in the 
+    # future
     def Lock(self, node, value):
         if node.lock:
             raise Issue('cannot lock an already locked node from web command!')
+        # we create a new entry for this lock and the locks that happen as a 
+        # result
         new_lock_data = (node, [])
         self.locks.append(new_lock_data)
         # and now we initiate the lock
@@ -155,7 +176,9 @@ class Web:
     def addLock(self, node, value):
         # we add a new node into the current_lock data
         self.locks[-1][1].append(node)
-        
+    
+    # this allows you to go back to the state of your nodes before the most 
+    # recent lock (this can be called repeatedly if you have made many locks    
     def RollBack(self):
         # first we empty errors NOTE THAT YOU SHOULD NOT KEEP GOING IF 
         # ERRORS EXIST!!!!
@@ -169,9 +192,12 @@ class Web:
         # we return the last actuated node for convenience
         return last_data[0]
     
+    # this allows us to track when we have tried to lock one node in many 
+    # ways, usually an indication of an error
     def HandleDoubleLock(self, node, value):
         self.errors.append((node, value))
-        
+    
+    # this rolls back all locks made so far
     def Unlock(self):
         # this will rollback everything
         while len(self.locks) > 0:
