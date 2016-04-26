@@ -76,7 +76,7 @@ class Angle:
             while self.value < 0:
                 self.value += 2 * pi
         else:
-            while self.value > 2 * pi:
+            while self.value >= 2 * pi:
                 self.value -= 2 * pi
         
     def __add__(self, other):
@@ -126,3 +126,56 @@ class Angle:
     
     def __str__(self):
         return str(self.value)
+"""
+This class takes an upper angle and a lower angle and then looks to check
+whether another angle is between them. upper and lower should be Angles
+""" 
+class Slice:
+    
+    def __init__(self, upper, lower, closed=True):
+        self.upper = lower
+        self.lower = upper
+        self.closed = closed
+        self.ranges = []
+        self.setupSlice()
+    
+    def setupSlice(self):
+        if self.upper.canonical < self.lower.canonical:
+            self.ranges.append((Angle(0),Angle(self.upper.canonical)))
+            self.ranges.append((Angle(self.lower.canonical), Angle(2*pi)))
+        else:
+            self.ranges.append((Angle(self.lower.canonical),Angle(self.upper.canonical)))
+            
+    def SetUpper(self, upper):
+        self.upper = upper
+        self.setupSlice()
+        
+    def SetLower(self, lower):
+        self.lower = lower
+        self.setupSlice()
+            
+    def __contains__(self, angle):
+        if not self.closed:
+            # we are working with an open interval so we take care of the 
+            # edges
+            if angle == self.upper or angle == self.lower:
+                return False
+        # the following behavior is for closed or open intervals
+        for bounds in self.ranges:
+            if angle >= bounds[0] and angle =< bounds[1]:
+                return True
+        return False
+            
+    
+"""
+Here is the class (and corresponding algorithm) for row-positive checks.
+"""
+
+class RowPositive:
+    
+    def __init__(self, A):
+        self.A = A
+        self.upper_inclusion = None
+        self.lower_inclusion = None
+        self.upper_exclusion = None
+        self.lower_inclusion = None
