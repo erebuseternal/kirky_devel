@@ -52,88 +52,18 @@ So not only can we check that A is row-positive, we can find the set of vectors
 that give us those positive rows. 
 """
 
-"""
-First I have been talking about adding pi to all angles, but we 
-all know this can lead to wacky stuff if our angle is already greater 
-than pi. So I am going to fix this comparison problem by creating a class
-that says 4pi == 2pi
-"""
-
 from math import pi
-
-class Angle:
-    
-    def __init__(self, value):
-        self.value = value
-        self.canonical = self.getcanonical()
-        
-    """
-    This takes a random angle and turns into its canonical form,
-    i.e. between 0 and 2pi
-    """
-    def getcanonical(self):
-        if self.value < 0:
-            while self.value < 0:
-                self.value += 2 * pi
-        else:
-            while self.value >= 2 * pi:
-                self.value -= 2 * pi
-        
-    def __add__(self, other):
-        return Angle(self.value + other.value)
-    
-    def __sub__(self, other):
-        return Angle(self.value - other.value)
-    
-    def __mul__(self, scalar):
-        return Angle(scalar * self.value)
-    
-    def __eq__(self, other):
-        if self.canonical == other.canonical:
-            return True
-        else:
-            return False
-        
-    def __gt__(self, other):
-        if self.canonical > other.canonical:
-            return True
-        else:
-            return False
-    
-    def __ge__(self, other):
-        if self.canonical >= other.canonical:
-            return True
-        else:
-            return False
-        
-    def __lt__(self, other):
-        if self.canonical < other.canonical:
-            return True
-        else:
-            return False
-        
-    def __le__(self, other):
-        if self.canonical <= other.canonical:
-            return True
-        else:
-            return False
-        
-    def __hash__(self):
-        return hash(self.canonical)
-    
-    def __repr__(self):
-        return str(self)
-    
-    def __str__(self):
-        return str(self.value)
-    
     
 class Slice:
     
     def __init__(self, angle1, angle2, closed=True):
-        self.inclusion_bounds = []
         self.WAITING_FOR_ORIENTATION = False
-        self.angles = []
+        self.angles = [angle1, angle2]
+        self.lower = None
+        self.upper = None
+        # now we set the two bounds
+        self.inclusion_bounds = self.getSliceBounds(angle1, angle2)
+        self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(angle1), self.getOppositeAngle(angle2))
         
     def rotateTo(self, angle1, angle2, clockwise):
         # this sees how many radians are needed to rotate angle1 to 
@@ -165,7 +95,8 @@ class Slice:
     are equal. Then we need to wait until we try to add in a new vector
     to choose the orientation of the 'interior' angle
     """       
-    def setSliceBounds(self, angle1, angle2):
+    def getSliceBounds(self, angle1, angle2):
+        bounds = []
         clockwise = self.rotateTo(angle1, angle2, True)
         counter_clockwise = self.rotateTo(angle1, angle2, False)
         if clockwise < counter_clockwise:
@@ -188,7 +119,14 @@ class Slice:
             # in this case they are equal so we need to wait for an 
             # orientation
             self.WAITING_FOR_ORIENTATION = True
-            self.angles = [angle1, angle2]
+        return bounds
+            
+    def getOppositeAngle(self, angle):
+        angle = angle + pi
+        while angle >= 2 * pi:
+            angle -= 2 * pi
+        return angle
+        
             
     """
     This next function attempts to 'add' a new angle in. What it does 
@@ -199,58 +137,71 @@ class Slice:
     
     Note, it also looks to see if an orientation selection is needed, 
     and tries to do it.
+    
+    Essentially this contains the checks for each new column of our matrix
+    C (for a particular angle that is of course)
     """
-"""
-This class takes an upper angle and a lower angle and then looks to check
-whether another angle is between them. upper and lower should be Angles
-""" 
-class Slice:
-    
-    def __init__(self, upper, lower, closed=True):
-        self.upper = lower
-        self.lower = upper
-        self.closed = closed
-        self.ranges = []
-        self.setupSlice()
-    
-    def setupSlice(self):
-        if self.upper.canonical < self.lower.canonical:
-            self.ranges.append((Angle(0),Angle(self.upper.canonical)))
-            self.ranges.append((Angle(self.lower.canonical), Angle(2*pi)))
-        else:
-            self.ranges.append((Angle(self.lower.canonical),Angle(self.upper.canonical)))
-            
-    def SetUpper(self, upper):
-        self.upper = upper
-        self.setupSlice()
-        
-    def SetLower(self, lower):
-        self.lower = lower
-        self.setupSlice()
-            
-    def __contains__(self, angle):
-        if not self.closed:
-            # we are working with an open interval so we take care of the 
-            # edges
-            if angle == self.upper or angle == self.lower:
-                return False
-        # the following behavior is for closed or open intervals
-        for bounds in self.ranges:
-            if angle >= bounds[0] and angle =< bounds[1]:
+    def AddAngle(self, angle):
+        # first we check to see if an orientation 
+        if self.WAITING_FOR_ORIENTATION:
+            """
+            Here we take the first angle in self.angles are see if the 
+            clockwise or counterclockwise rotate to the new angle is better. If 
+            neither is we just return True (we are still in the same boat)
+            Then if the clockwise is the best we set the 'upper' to the angle
+            we picked and 'lower' to the other angle and follow the same procedure
+            as for SetBounds. We do the opposite for counter-clockwise. 
+            Then we set self.WAITING_FOR_ORIENTATION to False and return True
+            """
+            clockwise = self.rotateTo(self.angles[0], angle)
+            counter_clockwise = self.rotateTo(self.angles[0], angle)
+            if clockwise == counter_clockwise:
                 return True
-        return False
-            
-            
-             
-"""
-Here is the class (and corresponding algorithm) for row-positive checks.
-"""
-
-class RowPositive:
-    
-    def __init__(self, A):
-        self.A = A
-        self.upper_inclusion = None
-        self.lower_inclusion = None
-        self.upper_exclusion = None
-        self.lower_inclusion = None
+            elif clockwise < counter_clockwise:
+                self.lower = self.angles[1]
+                self.upper = self.angles[0]
+                if self.upper < self.lower:
+                    self.inclusion_bounds.append((self.lower, 2*pi))
+                    self.inclusion_bounds.append((0,self.upper))
+                else:
+                    self.inclusion_bounds.append(self.lower, self.upper)
+            elif counter_clockwise < clockwise:
+                self.lower = self.angles[0]
+                self.upper = self.angles[1]
+                if self.upper < self.lower:
+                    self.inclusion_bounds.append((self.lower, 2*pi))
+                    self.inclusion_bounds.append((0,self.upper))
+                else:
+                    self.inclusion_bounds.append(self.lower, self.upper)
+            self.WAITING_FOR_ORIENTATION = False
+            return True
+        # now we handle adding an angle and checking exclusion area
+        # we check the exclusion area
+        for bound in self.exclusion_bounds:
+            if angle < bound[0] and angle > bound[1]:
+                return False
+        for bound in self.inclusion_bounds:
+            if angle < bound[0] and angle > bound[1]:
+                return True
+        # finally it must be outside of both bounds, so we need to 
+        # re-adjust the inclusion and exclusion bounds
+        if angle < self.lower:
+            # now we have to check that it is not both larger than the 
+            # upper bound and less than the lower bound 
+            if not angle > self.upper:
+                self.inclusion_bounds = self.getSliceBounds(self.upper, angle)
+                self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper), self.getOppositeAngle(angle))
+            else:
+                # in this case we have to which it is closer to and have it replace
+                # that one. Note it cannot be the same distance, because that 
+                # would put it in the exclusion zone
+                if angle - self.upper < self.lower - angle:
+                    self.inclusion_bounds = self.getSliceBounds(self.lower, angle)
+                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower), self.getOppositeAngle(angle))
+                else:
+                    self.inclusion_bounds = self.getSliceBounds(self.upper, angle)
+                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper), self.getOppositeAngle(angle))
+        else:
+            self.inclusion_bounds = self.getSliceBounds(self.lower, angle)
+            self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower), self.getOppositeAngle(angle))           
+        return True  
