@@ -126,6 +126,80 @@ class Angle:
     
     def __str__(self):
         return str(self.value)
+    
+    
+class Slice:
+    
+    def __init__(self, angle1, angle2, closed=True):
+        self.inclusion_bounds = []
+        self.WAITING_FOR_ORIENTATION = False
+        self.angles = []
+        
+    def rotateTo(self, angle1, angle2, clockwise):
+        # this sees how many radians are needed to rotate angle1 to 
+        # angle2 clockwise or counterclockwise depending on the value 
+        # of the clockwise input
+        if angle1 == angle2:
+            return 0
+        if not clockwise:
+            if angle2 < angle1:
+                return (2 * pi - angle1) + angle2
+            elif angle1 < angle2:
+                return angle2 - angle1
+        else:
+            if angle2 < angle1:
+                return angle1 - angle2
+            elif angle1 < angle2:
+                return angle1 + (2 * pi - angle2)
+    """
+    here we need to find the internal angle and then 
+    set the bounds based off of that finding. To do so we will
+    check to see if angle1 rotates to angle2 faster through a 
+    clockwise or counter clockwise direction. If it is clockwise 
+    we go ahead and set angle2 to what is our lower bound (taking
+    care of the case where the interior angle contains the axis we 
+    are taking the angle from). In the other case we do the opposite
+    (also taking care of the complication.
+    
+    Note that there is one complicated case, and that is where they 
+    are equal. Then we need to wait until we try to add in a new vector
+    to choose the orientation of the 'interior' angle
+    """       
+    def setSliceBounds(self, angle1, angle2):
+        clockwise = self.rotateTo(angle1, angle2, True)
+        counter_clockwise = self.rotateTo(angle1, angle2, False)
+        if clockwise < counter_clockwise:
+            self.lower = angle2
+            self.upper = angle1
+            if self.upper < self.lower:
+                self.bounds.append((self.lower, 2*pi))
+                self.bounds.append((0,self.upper))
+            else:
+                self.bounds.append(self.lower, self.upper)
+        elif counter_clockwise < clockwise:
+            self.lower = angle1
+            self.upper = angle2
+            if self.upper < self.lower:
+                self.bounds.append((self.lower, 2*pi))
+                self.bounds.append((0,self.upper))
+            else:
+                self.bounds.append(self.lower, self.upper)
+        else:
+            # in this case they are equal so we need to wait for an 
+            # orientation
+            self.WAITING_FOR_ORIENTATION = True
+            self.angles = [angle1, angle2]
+            
+    """
+    This next function attempts to 'add' a new angle in. What it does 
+    is checks to see whether the vector is within the inclusion bounds.
+    If so it returns True. It then checks to see if it is in the 
+    exclusion bounds, if so it returns False. Finally, if neither of these
+    are the case, it sets the new one as a new bound and returns True.
+    
+    Note, it also looks to see if an orientation selection is needed, 
+    and tries to do it.
+    """
 """
 This class takes an upper angle and a lower angle and then looks to check
 whether another angle is between them. upper and lower should be Angles
@@ -166,7 +240,8 @@ class Slice:
                 return True
         return False
             
-    
+            
+             
 """
 Here is the class (and corresponding algorithm) for row-positive checks.
 """
