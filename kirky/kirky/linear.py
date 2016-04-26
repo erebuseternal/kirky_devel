@@ -1,3 +1,5 @@
+from math import pi, atan2
+
 """
 Our first objective in this module is to be able to 
 check to see if for a particular matrix A there is 
@@ -52,8 +54,11 @@ So not only can we check that A is row-positive, we can find the set of vectors
 that give us those positive rows. 
 """
 
-from math import pi
-    
+"""
+This first class handles exclusion and inclusion once we have chosen a 
+plane 
+"""
+
 class Slice:
     
     def __init__(self, angle1, angle2, closed=True):
@@ -181,7 +186,7 @@ class Slice:
             if angle < bound[0] and angle > bound[1]:
                 return False
         for bound in self.inclusion_bounds:
-            if angle < bound[0] and angle > bound[1]:
+            if angle <= bound[0] and angle >= bound[1]:
                 return True
         # finally it must be outside of both bounds, so we need to 
         # re-adjust the inclusion and exclusion bounds
@@ -204,4 +209,49 @@ class Slice:
         else:
             self.inclusion_bounds = self.getSliceBounds(self.lower, angle)
             self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower), self.getOppositeAngle(angle))           
-        return True  
+        return True 
+    
+"""
+The following class takes a matrix and finds the size of the space you 
+are working in and then divides things up into planes, grabs angles for 
+each column vector and then works its way through the columns trying 
+to find the appropriate angles if it can find them
+""" 
+
+class RowPositive:
+    
+    def __init__(self, C):
+        self.matrix = C
+        self.dimension = self.matrix.shape[0]   # the number of rows is our dimension
+        # we will choose the first entry in column as the default 
+        # for what each other dimension will create a plane with
+        self.slices = [0]    # this will contain, in order of planes, the Slices corresponding 
+                            # to them. the first zero is just so we can index 
+                            # these slices by their dimension
+    
+    def Check(self):
+        # first we grab two columns and generate the slices 
+        # for each of the planes
+        column1 = self.matrix[:,0]
+        column2 = self.matrix[:,1]
+        for dimension in range(1, self.dimension):
+            angle1 = self.GetAngle(column1, dimension)
+            angle2 = self.GetAngle(column2, dimension)
+            slice = Slice(angle1, angle2)
+            self.slices.append(slice)
+        # now we run through the rest of the columns and try
+        # to add in their vectors. If anyone fails we return False
+        # otherwise we return True
+        for i in range(2, self.matrix.shape[1]):
+            column = self.matrix[:,i]
+            for dimension in range(1, self.dimension):
+                angle = self.GetAngle(column, dimension)
+                if not self.slices[dimension].AddAngle(angle):
+                    return False
+        return True
+            
+    def GetAngle(self, vector, dimension):
+        y = vector[0]
+        x = vector[dimension]
+        return atan2(y,x)
+        
