@@ -1,5 +1,5 @@
-from .symbolic import Web
-from .issue import Issue
+from symbolic import Web
+from issue import Issue
 
 class Vertex:
 

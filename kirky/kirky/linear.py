@@ -1,5 +1,5 @@
-from math import pi, atan2
-
+from math import pi, atan2, sin, cos
+from pyx import path
 """
 Our first objective in this module is to be able to 
 check to see if for a particular matrix A there is 
@@ -64,28 +64,35 @@ class Slice:
     def __init__(self, angle1, angle2, closed=True):
         self.WAITING_FOR_ORIENTATION = False
         self.angles = [angle1, angle2]
-        self.lower = None
-        self.upper = None
+        self.lower = [0,0]
+        self.upper = [0,0]
+        self.closed = closed
         # now we set the two bounds
         self.inclusion_bounds = self.getSliceBounds(angle1, angle2)
-        self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(angle1), self.getOppositeAngle(angle2))
-        
+        self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(angle1), self.getOppositeAngle(angle2), True)
+    
+    def __contains__(self, angle):
+        for bound in self.inclusion_bounds:
+            if angle <= bound[1] and angle >= bound[0]:
+                return True
+        return False
+       
     def rotateTo(self, angle1, angle2, clockwise):
         # this sees how many radians are needed to rotate angle1 to 
         # angle2 clockwise or counterclockwise depending on the value 
         # of the clockwise input
         if angle1 == angle2:
-            return 0
+            return 0.0
         if not clockwise:
             if angle2 < angle1:
-                return (2 * pi - angle1) + angle2
+                return (2.0 * pi - angle1) + angle2
             elif angle1 < angle2:
                 return angle2 - angle1
         else:
             if angle2 < angle1:
                 return angle1 - angle2
             elif angle1 < angle2:
-                return angle1 + (2 * pi - angle2)
+                return angle1 + (2.0 * pi - angle2)
     """
     here we need to find the internal angle and then 
     set the bounds based off of that finding. To do so we will
@@ -100,26 +107,31 @@ class Slice:
     are equal. Then we need to wait until we try to add in a new vector
     to choose the orientation of the 'interior' angle
     """       
-    def getSliceBounds(self, angle1, angle2):
+    def getSliceBounds(self, angle1, angle2, excl=False):
+        if not excl:
+            index = 0
+        else:
+            index = 1
         bounds = []
+        print('%s %s' % (angle1, angle2))
         clockwise = self.rotateTo(angle1, angle2, True)
         counter_clockwise = self.rotateTo(angle1, angle2, False)
         if clockwise < counter_clockwise:
-            self.lower = angle2
-            self.upper = angle1
+            self.lower[index] = angle2
+            self.upper[index] = angle1
             if self.upper < self.lower:
-                self.bounds.append((self.lower, 2*pi))
-                self.bounds.append((0,self.upper))
+                bounds.append((self.lower[index], 2.0*pi))
+                bounds.append((0.0,self.upper[index]))
             else:
-                self.bounds.append(self.lower, self.upper)
+                bounds.append((self.lower[index], self.upper[index]))
         elif counter_clockwise < clockwise:
-            self.lower = angle1
-            self.upper = angle2
-            if self.upper < self.lower:
-                self.bounds.append((self.lower, 2*pi))
-                self.bounds.append((0,self.upper))
+            self.lower[index] = angle1
+            self.upper[index] = angle2
+            if self.upper[index] < self.lower[index]:
+                bounds.append((self.lower[index], 2.0*pi))
+                bounds.append((0.0,self.upper[index]))
             else:
-                self.bounds.append(self.lower, self.upper)
+                bounds.append((self.lower[index], self.upper[index]))
         else:
             # in this case they are equal so we need to wait for an 
             # orientation
@@ -128,8 +140,8 @@ class Slice:
             
     def getOppositeAngle(self, angle):
         angle = angle + pi
-        while angle >= 2 * pi:
-            angle -= 2 * pi
+        while angle >= 2.0 * pi:
+            angle -= 2.0 * pi
         return angle
         
             
@@ -163,21 +175,21 @@ class Slice:
             if clockwise == counter_clockwise:
                 return True
             elif clockwise < counter_clockwise:
-                self.lower = self.angles[1]
-                self.upper = self.angles[0]
+                self.lower[0] = self.angles[1]
+                self.upper[0] = self.angles[0]
                 if self.upper < self.lower:
-                    self.inclusion_bounds.append((self.lower, 2*pi))
-                    self.inclusion_bounds.append((0,self.upper))
+                    self.inclusion_bounds.append((self.lower[0], 2.0*pi))
+                    self.inclusion_bounds.append((0.0,self.upper[0]))
                 else:
-                    self.inclusion_bounds.append(self.lower, self.upper)
+                    self.inclusion_bounds.append(self.lower[0], self.upper[0])
             elif counter_clockwise < clockwise:
-                self.lower = self.angles[0]
-                self.upper = self.angles[1]
+                self.lower[0] = self.angles[0]
+                self.upper[0] = self.angles[1]
                 if self.upper < self.lower:
-                    self.inclusion_bounds.append((self.lower, 2*pi))
-                    self.inclusion_bounds.append((0,self.upper))
+                    self.inclusion_bounds.append((self.lower[0], 2.0*pi))
+                    self.inclusion_bounds.append((0.0,self.upper[0]))
                 else:
-                    self.inclusion_bounds.append(self.lower, self.upper)
+                    self.inclusion_bounds.append(self.lower[0], self.upper[0])
             self.WAITING_FOR_ORIENTATION = False
             return True
         # now we handle adding an angle and checking exclusion area
@@ -194,22 +206,31 @@ class Slice:
             # now we have to check that it is not both larger than the 
             # upper bound and less than the lower bound 
             if not angle > self.upper:
-                self.inclusion_bounds = self.getSliceBounds(self.upper, angle)
-                self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper), self.getOppositeAngle(angle))
+                self.inclusion_bounds = self.getSliceBounds(self.upper[0], angle)
+                self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper[0]), self.getOppositeAngle(angle), True)
             else:
                 # in this case we have to which it is closer to and have it replace
                 # that one. Note it cannot be the same distance, because that 
                 # would put it in the exclusion zone
                 if angle - self.upper < self.lower - angle:
-                    self.inclusion_bounds = self.getSliceBounds(self.lower, angle)
-                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower), self.getOppositeAngle(angle))
+                    self.inclusion_bounds = self.getSliceBounds(self.lower[0], angle)
+                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower[0]), self.getOppositeAngle(angle), True)
                 else:
-                    self.inclusion_bounds = self.getSliceBounds(self.upper, angle)
-                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper), self.getOppositeAngle(angle))
+                    self.inclusion_bounds = self.getSliceBounds(self.upper[0], angle)
+                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper[0]), self.getOppositeAngle(angle), True)
         else:
-            self.inclusion_bounds = self.getSliceBounds(self.lower, angle)
-            self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower), self.getOppositeAngle(angle))           
+            self.inclusion_bounds = self.getSliceBounds(self.lower[0], angle)
+            self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower[0]), self.getOppositeAngle(angle), True)           
         return True 
+    
+    def Draw(self, canvas, circle_size):
+        # so we are going to essentially draw two lines within the 
+        # square given by the bounds (x,y)
+        # we start with the upper
+        canvas.stroke(path.line(0,0,circle_size * cos(self.upper[0]), circle_size * sin(self.upper[0])))
+        # then we do the lower
+        canvas.stroke(path.line(0,0,circle_size * cos(self.lower[0]), circle_size * sin(self.lower[0])))
+
     
 """
 The following class takes a matrix and finds the size of the space you 
@@ -249,9 +270,63 @@ class RowPositive:
                 if not self.slices[dimension].AddAngle(angle):
                     return False
         return True
-            
+                
     def GetAngle(self, vector, dimension):
         y = vector[0]
         x = vector[dimension]
         return atan2(y,x)
+    
+from vertex import Index   
+from copy import copy
+
+class Point:
+    
+    def __init__(self, position):
+        self.position = position
+
+class Lattice:
+    
+    def __init__(self):
+        self.points = []
+        self.marked = []
+        self.index = Index(2, 0, 2)
+        
+    def GrowAbout(self, position):
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                new_position = copy(position)
+                new_position[0] += i
+                new_position[1] += j
+                if not self.index.GetElement(new_position):
+                    point = Point(new_position)
+                    self.index.AddElement(point)
+                    self.points.append(point)
+                    
+    def FindBestPoint(self, slice):
+        current_best_distance = 10000000
+        best_point = None
+        for point in self.points:
+            angle = atan2(point.position[1], point.position[2])
+            upper_dif = abs(angle - slice.upper)
+            lower_dif = abs(angle - slice.lower)
+            if upper_dif >= lower_dif:
+                if lower_dif < current_best_distance:
+                    current_best_distance = lower_dif
+                    best_point = point
+            else:
+                if upper_dif < current_best_distance:
+                    current_best_distance = upper_dif
+                    best_point = point
+        return best_point
+    
+    def FindMarkedPoints(self, slice):
+        for point in self.points:
+            angle = atan2(point.position[1], point.position[0])
+            if angle in slice:
+                self.marked.append(point) 
+                   
+    def Draw(self, canvas):
+        for point in self.points:
+            canvas.fill(path.circle(point.position[0], point.position[1], 0.04))
+            
         

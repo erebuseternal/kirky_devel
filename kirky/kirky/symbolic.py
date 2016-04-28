@@ -1,4 +1,4 @@
-from .issue import Issue
+from issue import Issue
 
 """
 The basic idea of a node is the following. Each node can have a series of parent
