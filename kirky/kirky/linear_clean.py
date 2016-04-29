@@ -59,6 +59,92 @@ This first class handles exclusion and inclusion once we have chosen a
 plane 
 """
 
+
+class Angle:
+    
+    def __init__(self, value):
+        self.value = self.canonicalize(value)
+    
+    # canonicalization places the angle in the range [0, 2pi)
+    def canonicalize(self, value):
+        while value < 0:
+            value += 2.0 * pi
+        while value >= 2 * pi:
+            value -= 2.0 * pi
+    
+    # this returns the number of radians needed to rotate the current 
+    # angle to the other angle in a counterclockwise direction      
+    def rotation(self, other):
+        if self.value == other.value:
+            return Angle(0.0)
+        # if the other is larger than self, its easy we just take the 
+        # difference
+        if self.value < other.value:
+            return other - self
+        # otherwise in moving counterclockwise we will move through 
+        # 0, therefore we have to take advantage of this
+        if other.value < self.value:
+            return (Angle(2.0 * pi) - self) + other
+    
+    # this is exactly what you'd think   
+    def __eq__(self, other):
+        if self.value == other.value:
+            return True
+        else:
+            return False
+        
+    # self is greater than other if the counterclockwise rotation from
+    # other to self is less than the other way around or if both 
+    # rotations are equal but self - other is greater than 0. Note
+    # that this means that 0 < pi but also 2 pi < pi (because how 
+    # we have decided to standardize
+    def __gt__(self, other):
+        self_other = self.rotation(other)
+        other_self = other.rotation(self)
+        if other_self.value < self_other.value:
+            return True
+        elif other_self.value == self_other.value and self.value - other.value > 0:
+            return True
+        else:
+            return False
+        
+    # we define this based off of __gt__ and __eq__
+    def __lt__(self, other):
+        if not self > other and not self == other:
+            return True
+        else:
+            return False
+        
+    def __ge__(self, other):
+        if self > other or self == other:
+            return True
+        else:
+            return False
+        
+    def __le__(self, other):
+        if self < other or self == other:
+            return True
+        else:
+            return False
+        
+    def __add__(self, other):
+        return Angle(self.value + self.other)
+    
+    def __mul__(self, scalar):
+        return Angle(self.value * scalar)
+
+    def __sub__(self, other):
+        return Angle(self.value - other.value)
+        
+    def __str__(self):
+        return str(self.value)
+    
+    def __repr__(self):
+        return str(self)
+    
+    def __hash__(self):
+        return hash(self.value)
+
 class Slice:
     
     def __init__(self, angle1, angle2, closed=True):
@@ -69,11 +155,10 @@ class Slice:
         self.closed = closed
         # now we set the two bounds
         self.inclusion_bounds = self.getSliceBounds(angle1, angle2)
-        self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(angle1), self.getOppositeAngle(angle2), True)
+        self.pi = Angle(pi)
     
     def __contains__(self, angle):
         for bound in self.inclusion_bounds:
-            print(angle)
             if angle <= bound[1] and angle >= bound[0]:
                 return True
         return False
@@ -85,15 +170,18 @@ class Slice:
         if angle1 == angle2:
             return 0.0
         if not clockwise:
-            if angle2 < angle1:
-                return (2.0 * pi - angle1) + angle2
+            # so here we are looking at rotating to counterclockwise 
+            # direction
+            if angle2 < angle1: # here we have to move through 2pi
+                return (2.0 * self.pi - angle1) + angle2
             elif angle1 < angle2:
                 return angle2 - angle1
         else:
+            # here we are looking at rotating clockwise
             if angle2 < angle1:
                 return angle1 - angle2
-            elif angle1 < angle2:
-                return angle1 + (2.0 * pi - angle2)
+            elif angle1 < angle2:   # here we have to move through 2pi
+                return angle1 + (2.0 * self.pi - angle2)
     """
     here we need to find the internal angle and then 
     set the bounds based off of that finding. To do so we will
@@ -108,52 +196,59 @@ class Slice:
     are equal. Then we need to wait until we try to add in a new vector
     to choose the orientation of the 'interior' angle
     """       
-    def getSliceBounds(self, angle1, angle2, excl=False):
-        angle1 = self.ConvertAngle(angle1)
-        angle2 = self.ConvertAngle(angle2)
-        if not excl:
-            index = 0
-        else:
-            index = 1
+    def getSliceBounds(self, angle1, angle2):
         bounds = []
-        print('%s %s' % (angle1, angle2))
+        # next we look to see whether the clockwise or counter clockwise
+        # rotation of angle1 to angle2 is smaller. 
         clockwise = self.rotateTo(angle1, angle2, True)
         counter_clockwise = self.rotateTo(angle1, angle2, False)
-        print(angle1)
-        if clockwise < counter_clockwise:
-            self.lower[index] = angle2
-            self.upper[index] = angle1
-            if self.upper < self.lower:
-                bounds.append((self.lower[index], 2.0*pi))
-                bounds.append((0.0,self.upper[index]))
-            else:
-                bounds.append((self.lower[index], self.upper[index]))
-        elif counter_clockwise < clockwise:
-            self.lower[index] = angle1
-            self.upper[index] = angle2
-            if self.upper[index] < self.lower[index]:
-                bounds.append((self.lower[index], 2.0*pi))
-                bounds.append((0.0,self.upper[index]))
-            else:
-                bounds.append((self.lower[index], self.upper[index]))
-        else:
+        if clockwise == counter_clockwise:
             if angle1 != angle2:
                 # in this case the rotations are equal so we need to wait for an 
-                # orientation
+                # orientation because our angles are pi away from each other and 
+                # form a line. There is no clear interior angle of a line
                 self.WAITING_FOR_ORIENTATION = True
             else:
-                print(angle1)
-                self.upper[index] = angle1
-                print(self.upper)
-                self.lower[index] = angle2
+                # in this case they are the same angle so this case is pretty 
+                # simple
+                self.upper = angle1
+                self.lower = angle2
                 bounds.append((self.upper,self.lower))
-        print(bounds)
+        else:
+            # now we can deal with the case with a clear interior angle
+            # if the clockwise direction is smaller then our lower angle 
+            # is angle2
+            if clockwise < counter_clockwise:
+                self.lower = angle2
+                self.upper = angle1
+            # if the counter clockwise direction is smaller then our lower angle
+            # is angle1
+            else:
+                self.lower = angle1
+                self.upper = angle2
+            # next we create the bounds. Note that we have to deal with 
+            # the case where the bound includes 2pi. This is what this
+            # first condition does
+            if self.upper < self.lower:
+                bounds.append((self.lower, 2.0 * self.pi))
+                bounds.append((0.0,self.upper))
+            else:
+                bounds.append((self.lower, self.upper))
         return bounds
-            
+    
+    def GetExclusionSlice(self):
+        # this is the slice composed of two angles:
+        # the angle pi/2 greater than upper angle or opposite to
+        # the the lesser angle, whichever is smaller. And the angle
+        # pi/2 smaller than the lower angle or opposite the upper 
+        # angle, in this case whichever is larger.
+        # So first we get these angles. Note that if angle1 is larger 
+        # than angle2 that it means the clockwise rotation from angle2
+        # to angle1 is smaller than the reverse. 
+    
     def getOppositeAngle(self, angle):
-        angle = angle + pi
-        while angle >= 2.0 * pi:
-            angle -= 2.0 * pi
+        # note this gets the opposite angle by adding pi
+        angle = angle + self.pi
         return angle
         
             
@@ -379,17 +474,4 @@ class Lattice:
 # What we are going to do is perform this over each angle and then get the 
 # axis we compared too to match up for all of these
 
-class Angle:
-    
-    def __init__(self, value):
-        self.value 
-        
-    def __add__(self, other):
-        return Angle(self.value + self.other)
-    
-    def __mul__(self, scalar):
-        return Angle(self.value * scalar)
-
-    def __sub__(self, other):
-        return Angle(self.value - other.value)
         
