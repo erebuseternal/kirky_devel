@@ -1,5 +1,6 @@
 from math import pi, atan2, sin, cos
 from pyx import path
+from issue import Issue
 """
 Our first objective in this module is to be able to 
 check to see if for a particular matrix A there is 
@@ -85,6 +86,9 @@ class Angle:
         # 0, therefore we have to take advantage of this
         if other.value < self.value:
             return (Angle(2.0 * pi) - self) + other
+        
+    def opposite(self):
+        return Angle(self.value + pi)
     
     # this is exactly what you'd think   
     def __eq__(self, other):
@@ -122,7 +126,7 @@ class Angle:
             return False
         
     def __le__(self, other):
-        if self < other or self == other:
+        if not self > other:
             return True
         else:
             return False
@@ -147,109 +151,88 @@ class Angle:
 
 class Slice:
     
-    def __init__(self, angle1, angle2, closed=True):
+    def __init__(self, angle1, angle2, IS_EXCLUSION_SLICE=False):
+        self.Setup(angle1, angle2, IS_EXCLUSION_SLICE)
+            
+    def Setup(self, angle1, angle2, IS_EXCLUSION_SLICE=False):
         self.WAITING_FOR_ORIENTATION = False
-        self.angles = [angle1, angle2]
-        self.lower = [0,0]
-        self.upper = [0,0]
-        self.closed = closed
+        self.lower = None
+        self.upper = None
+        # we classify the angles 
+        self.ClassifyAngles(angle1, angle2)
         # now we set the two bounds
-        self.inclusion_bounds = self.getSliceBounds(angle1, angle2)
+        if not self.WAITING_FOR_ORIENTATION:
+            self.SetBounds()
         self.pi = Angle(pi)
-    
+        self.IS_EXCLUSION_SLICE = IS_EXCLUSION_SLICE
+        self.exclusion_slice = None
+        # now we check to see if we need to make an exclusion slice
+        if not self.WAITING_FOR_ORIENTATION and not self.IS_EXCLUSION_SLICE:
+            self.SetExclusionSlice()
+            
     def __contains__(self, angle):
-        for bound in self.inclusion_bounds:
-            if angle <= bound[1] and angle >= bound[0]:
-                return True
+        if self.IS_EXCLUSION_SLICE:
+            # exclusion slices are open intervals
+            for bound in self.bounds:
+                if angle < bound[1] and angle > bound[0]:
+                    return True
+        else:
+            for bound in self.bounds:
+                if angle <= bound[1] and angle >= bound[0]:
+                    return True
         return False
-       
-    def rotateTo(self, angle1, angle2, clockwise):
-        # this sees how many radians are needed to rotate angle1 to 
-        # angle2 clockwise or counterclockwise depending on the value 
-        # of the clockwise input
-        if angle1 == angle2:
-            return 0.0
-        if not clockwise:
-            # so here we are looking at rotating to counterclockwise 
-            # direction
-            if angle2 < angle1: # here we have to move through 2pi
-                return (2.0 * self.pi - angle1) + angle2
-            elif angle1 < angle2:
-                return angle2 - angle1
+      
+    def ClassifyAngles(self, angle1, angle2):
+        # first we set the larger of the two to upper and the smaller
+        # to lower
+        if angle1 >= angle2:
+            self.upper = angle1
+            self.lower = angle2
         else:
-            # here we are looking at rotating clockwise
-            if angle2 < angle1:
-                return angle1 - angle2
-            elif angle1 < angle2:   # here we have to move through 2pi
-                return angle1 + (2.0 * self.pi - angle2)
-    """
-    here we need to find the internal angle and then 
-    set the bounds based off of that finding. To do so we will
-    check to see if angle1 rotates to angle2 faster through a 
-    clockwise or counter clockwise direction. If it is clockwise 
-    we go ahead and set angle2 to what is our lower bound (taking
-    care of the case where the interior angle contains the axis we 
-    are taking the angle from). In the other case we do the opposite
-    (also taking care of the complication.
-    
-    Note that there is one complicated case, and that is where they 
-    are equal. Then we need to wait until we try to add in a new vector
-    to choose the orientation of the 'interior' angle
-    """       
-    def getSliceBounds(self, angle1, angle2):
-        bounds = []
-        # next we look to see whether the clockwise or counter clockwise
-        # rotation of angle1 to angle2 is smaller. 
-        clockwise = self.rotateTo(angle1, angle2, True)
-        counter_clockwise = self.rotateTo(angle1, angle2, False)
-        if clockwise == counter_clockwise:
-            if angle1 != angle2:
-                # in this case the rotations are equal so we need to wait for an 
-                # orientation because our angles are pi away from each other and 
-                # form a line. There is no clear interior angle of a line
-                self.WAITING_FOR_ORIENTATION = True
-            else:
-                # in this case they are the same angle so this case is pretty 
-                # simple
-                self.upper = angle1
-                self.lower = angle2
-                bounds.append((self.upper,self.lower))
+            self.upper = angle2
+            self.lower = angle1
+        # next we look to make sure that these two are not separated by 
+        # pi, in which case we will have to wait for a third angle to 
+        # determine the orientation of the slice
+        if self.upper - self.lower == Angle(pi):
+            self.WAITING_FOR_ORIENTATION = True
+            return
+        
+    def SetBounds(self):
+        # Note that we have to deal with 
+        # the case where the bound includes 2pi. This is what this
+        # first condition does
+        if self.upper.value < self.lower.value:
+            self.bounds.append((self.lower, 2.0 * self.pi))
+            self.bounds.append((0.0,self.upper))
         else:
-            # now we can deal with the case with a clear interior angle
-            # if the clockwise direction is smaller then our lower angle 
-            # is angle2
-            if clockwise < counter_clockwise:
-                self.lower = angle2
-                self.upper = angle1
-            # if the counter clockwise direction is smaller then our lower angle
-            # is angle1
-            else:
-                self.lower = angle1
-                self.upper = angle2
-            # next we create the bounds. Note that we have to deal with 
-            # the case where the bound includes 2pi. This is what this
-            # first condition does
-            if self.upper < self.lower:
-                bounds.append((self.lower, 2.0 * self.pi))
-                bounds.append((0.0,self.upper))
-            else:
-                bounds.append((self.lower, self.upper))
-        return bounds
+            self.bounds.append((self.lower, self.upper))
     
-    def GetExclusionSlice(self):
+    def SetExclusionSlice(self):
+        # first we can only set exclusion slices on 
+        # slices that aren't exclusion slices
+        if self.IS_EXCLUSION_SLICE:
+            raise Issue('cannot add exclusion slice to exclusion slice')
         # this is the slice composed of two angles:
         # the angle pi/2 greater than upper angle or opposite to
         # the the lesser angle, whichever is smaller. And the angle
         # pi/2 smaller than the lower angle or opposite the upper 
         # angle, in this case whichever is larger.
-        # So first we get these angles. Note that if angle1 is larger 
-        # than angle2 that it means the clockwise rotation from angle2
-        # to angle1 is smaller than the reverse. 
-    
-    def getOppositeAngle(self, angle):
-        # note this gets the opposite angle by adding pi
-        angle = angle + self.pi
-        return angle
+        # So first we get these angles. 
+        increment = self.upper + (1/2) * self.pi
+        opposite = self.lower.opposite()
+        if increment <= opposite:
+            angle1 = increment
+        else:
+            angle1 = opposite
+        increment = self.lower - (1/2) * self.pi
+        opposite = self.upper.opposite()
+        if increment >= opposite:
+            angle2 = increment
+        else:
+            angle2 = opposite
+        # now we can set the exclusion slice
+        self.exclusion_slice = Slice(angle1, angle2, False)
         
             
     """
@@ -266,84 +249,66 @@ class Slice:
     C (for a particular angle that is of course)
     """
     def AddAngle(self, angle):
-        angle = self.ConvertAngle(angle)
         # first we check to see if an orientation 
         if self.WAITING_FOR_ORIENTATION:
-            """
-            Here we take the first angle in self.angles are see if the 
-            clockwise or counterclockwise rotate to the new angle is better. If 
-            neither is we just return True (we are still in the same boat)
-            Then if the clockwise is the best we set the 'upper' to the angle
-            we picked and 'lower' to the other angle and follow the same procedure
-            as for SetBounds. We do the opposite for counter-clockwise. 
-            Then we set self.WAITING_FOR_ORIENTATION to False and return True
-            """
-            clockwise = self.rotateTo(self.angles[0], angle)
-            counter_clockwise = self.rotateTo(self.angles[0], angle)
-            if clockwise == counter_clockwise:
+            # our orientation is now determined in the following way.
+            # Whichever angle (upper or lower) that is larger than 
+            # angle becomes the upper. If the angle is equal to either 
+            # angle we just pass on. In either case we return True
+            if angle == self.upper or angle == self.lower:
                 return True
-            elif clockwise < counter_clockwise:
-                self.lower[0] = self.angles[1]
-                self.upper[0] = self.angles[0]
-                if self.upper < self.lower:
-                    self.inclusion_bounds.append((self.lower[0], 2.0*pi))
-                    self.inclusion_bounds.append((0.0,self.upper[0]))
-                else:
-                    self.inclusion_bounds.append(self.lower[0], self.upper[0])
-            elif counter_clockwise < clockwise:
-                self.lower[0] = self.angles[0]
-                self.upper[0] = self.angles[1]
-                if self.upper < self.lower:
-                    self.inclusion_bounds.append((self.lower[0], 2.0*pi))
-                    self.inclusion_bounds.append((0.0,self.upper[0]))
-                else:
-                    self.inclusion_bounds.append(self.lower[0], self.upper[0])
+            if self.lower > angle:
+                self.upper, self.lower = (self.lower, self.upper)
+            # note we don't care about the case when self.upper > angle
+            # anyways now we can set our bounds
+            self.SetBounds()
+            # finally, now we unset WAITING_FOR_ORIENTATION, and if this 
+            # is not an exclusion slice, we need to set the exclusion 
+            # slice now
             self.WAITING_FOR_ORIENTATION = False
+            if not self.IS_EXCLUSION_SLICE:
+                self.SetExclusionSlice()
+            # and we are done here!
             return True
-        # now we handle adding an angle and checking exclusion area
-        # we check the exclusion area
-        for bound in self.exclusion_bounds:
-            if angle < bound[0] and angle > bound[1]:
-                return False
-        for bound in self.inclusion_bounds:
-            if angle <= bound[0] and angle >= bound[1]:
-                return True
-        # finally it must be outside of both bounds, so we need to 
-        # re-adjust the inclusion and exclusion bounds
+        # in this case our slice and its exclusion bound is well set
+        # so we can now go ahead and attempt to add our angle as per
+        # le norm
+        # first we check the exclusion area
+        if angle in self.exclusion_slice:
+            return False
+        # next we check the bounds on this slice
+        if angle in self:
+            return True
+        # finally if it is in neither, then this new angle is going 
+        # to extend our bounds! so we need to see in which direction it 
+        # does so. To do this, we need to see if it smaller than the lower
+        # bound, or larger that the upper bound. Because we already 
+        # checked the exclusion area, there can be no other option
+        if angle > self.upper:
+            lower = self.lower
+            # so we start by classifying our angles and setting our bounds 
+            self.Setup(angle, self.upper)
+            # now we need to check to see if our slice is waiting for 
+            # its orientation, in which case we fix the orientation with 
+            # lower
+            if self.WAITING_FOR_ORIENTATION:
+                self.AddAngle(lower)
+            # and we are done!
+            return True
         if angle < self.lower:
-            # now we have to check that it is not both larger than the 
-            # upper bound and less than the lower bound 
-            if not angle > self.upper:
-                self.inclusion_bounds = self.getSliceBounds(self.upper[0], angle)
-                self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper[0]), self.getOppositeAngle(angle), True)
-            else:
-                # in this case we have to which it is closer to and have it replace
-                # that one. Note it cannot be the same distance, because that 
-                # would put it in the exclusion zone
-                if angle - self.upper < self.lower - angle:
-                    self.inclusion_bounds = self.getSliceBounds(self.lower[0], angle)
-                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower[0]), self.getOppositeAngle(angle), True)
-                else:
-                    self.inclusion_bounds = self.getSliceBounds(self.upper[0], angle)
-                    self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.upper[0]), self.getOppositeAngle(angle), True)
-        else:
-            self.inclusion_bounds = self.getSliceBounds(self.lower[0], angle)
-            self.exclusion_bounds = self.getSliceBounds(self.getOppositeAngle(self.lower[0]), self.getOppositeAngle(angle), True)           
-        return True 
+            upper = self.upper
+            self.Setup(angle, self.lower)
+            if self.WAITING_FOR_ORIENTATION:
+                self.AddAngle(upper)
+            return True
     
     def Draw(self, canvas, circle_size):
         # so we are going to essentially draw two lines within the 
         # square given by the bounds (x,y)
         # we start with the upper
-        canvas.stroke(path.line(0,0,circle_size * cos(self.upper[0]), circle_size * sin(self.upper[0])))
+        canvas.stroke(path.line(0,0,circle_size * cos(self.upper.value[0]), circle_size * sin(self.upper.value[0])))
         # then we do the lower
-        canvas.stroke(path.line(0,0,circle_size * cos(self.lower[0]), circle_size * sin(self.lower[0])))
-
-    def ConvertAngle(self, angle):
-        angle = atan2(sin(angle), cos(angle))
-        if angle < 0:
-            angle = angle + 2 * pi
-        return angle
+        canvas.stroke(path.line(0,0,circle_size * cos(self.lower.value[0]), circle_size * sin(self.lower.value[0])))
 """
 The following class takes a matrix and finds the size of the space you 
 are working in and then divides things up into planes, grabs angles for 
