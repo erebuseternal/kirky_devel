@@ -1,6 +1,10 @@
 from math import pi, atan2, sin, cos
 from pyx import path
 from issue import Issue
+from vertex import Index
+from copy import copy
+from fractions import Fraction
+
 """
 Our first objective in this module is to be able to 
 check to see if for a particular matrix A there is 
@@ -301,14 +305,124 @@ class Slice:
             if self.WAITING_FOR_ORIENTATION:
                 self.AddAngle(upper)
             return True
-    
+
     def Draw(self, canvas, circle_size):
+        if not self.IS_EXCLUSION_SLICE:
+            self.exclusion_slice.DrawBounds(canvas, circle_size)
+        self.Draw(canvas, circle_size)
+
+    def DrawBounds(self, canvas, circle_size):
         # so we are going to essentially draw two lines within the 
         # square given by the bounds (x,y)
         # we start with the upper
         canvas.stroke(path.line(0,0,circle_size * cos(self.upper.value[0]), circle_size * sin(self.upper.value[0])))
         # then we do the lower
         canvas.stroke(path.line(0,0,circle_size * cos(self.lower.value[0]), circle_size * sin(self.lower.value[0])))
+
+class Point:
+
+    def __init__(self, position):
+        self.position = position
+
+class InteriorPointFinder:
+
+    def __init__(self, slice):
+        self.points = []
+        self.interior = []
+        self.used_positions = []
+        self.index = Index(2, 0, 2)
+        self.slice = slice
+
+    def GrowAbout(self, position):
+        # this method adds lattice points in a square around the position
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                new_position = copy(position)
+                new_position[0] += i
+                new_position[1] += j
+                if not self.index.GetElement(new_position):
+                    point = Point(new_position)
+                    self.index.AddElement(point)
+                    self.points.append(point)
+
+    def FindBestPoint(self):
+        # this finds the point closest to the slice interior that hasn't already
+        # been used
+        current_best_distance = 10000000
+        best_point = None
+        # we run through the points
+        for point in self.points:
+            # we skip points that have already been used
+            if point.position in self.used_positions:
+                continue
+            angle = self.GetAngle(point)
+            # we get the angle differences (as positive numbers)
+            upper_dif = abs(angle.value - self.slice.upper.value)
+            lower_dif = abs(angle.value - self.slice.lower.value)
+            # and now we just find the smallest one and compare it the current_best_distance
+            if upper_dif >= lower_dif:
+                if lower_dif < current_best_distance:
+                    current_best_distance = lower_dif
+                    best_point = point
+            else:
+                if upper_dif < current_best_distance:
+                    current_best_distance = upper_dif
+                    best_point = point
+        return best_point
+
+    def FindInteriorPoints(self):
+        for point in self.points:
+            angle = self.GetAngle(point)
+            if angle in self.slice:
+                self.interior.append(point)
+
+    def GetAngle(self, point):
+        angle_value = atan2(point.position[1], point.position[0])
+        angle = Angle(angle_value)
+        return angle
+
+    # this method grows our lattice until we find one or more interior points
+    # it returns the first one in the list of discovered ones
+    def FindInteriorPoints(self, max=None):
+        # first we grow about 0,0
+        self.GrowAbout([0,0])
+        # then we look to see if there are any points inside the slice
+        self.FindInteriorPoints()
+        # this just tracks how many iterations we have done so far
+        count = 0
+        while not self.interior:
+            # so while we haven't found anything inside the slice
+            # we find the closest point
+            point = self.FindBestPoint()
+            # then we grow about that point
+            self.GrowAbout(point.position)
+            # we mark it off as having been used
+            self.used_positions.append(point.position)
+            # and we look for interior points
+            self.FindInteriorPoints()
+            count += 1
+            # this checks to see if we have maxed out on iterations
+            if max and count == max:
+                break
+        return self.interior[0]
+
+    def Draw(self, canvas):
+        for point in self.points:
+            canvas.fill(path.circle(point.position[0], point.position[1], 0.04))
+
+# this just ties together the previous classes really nicely
+class Splitter:
+
+    def __init__(self, angle1, angle2):
+        self.slice = Slice(angle1, angle2)
+        self.point_finder = InteriorPointFinder(self.slice)
+
+    def TryAngle(self, angle):
+        return self.slice.AddAngle(angle)
+
+    def FindPoint(self):
+        return self.point_finder.FindInteriorPoints()
+
 """
 The following class takes a matrix and finds the size of the space you 
 are working in and then divides things up into planes, grabs angles for 
@@ -323,11 +437,12 @@ class RowPositive:
         self.dimension = self.matrix.shape[0]   # the number of rows is our dimension
         # we will choose the first entry in column as the default 
         # for what each other dimension will create a plane with
-        self.slices = [0]    # this will contain, in order of planes, the Slices corresponding 
-                            # to them. the first zero is just so we can index 
-                            # these slices by their dimension
-    
-    def Check(self):
+        self.splitters = []    # this will contain, in order of planes, the splitters corresponding
+                            # to them.
+
+    # this checks to make sure all of the columns are splittable and generates the splitters
+    # as you go
+    def CheckAndGenerate(self):
         # first we grab two columns and generate the slices 
         # for each of the planes
         column1 = self.matrix[:,0]
@@ -335,8 +450,8 @@ class RowPositive:
         for dimension in range(1, self.dimension):
             angle1 = self.GetAngle(column1, dimension)
             angle2 = self.GetAngle(column2, dimension)
-            slice = Slice(angle1, angle2)
-            self.slices.append(slice)
+            splitter = Splitter(angle1, angle2)
+            self.splitters.append(splitter)
         # now we run through the rest of the columns and try
         # to add in their vectors. If anyone fails we return False
         # otherwise we return True
@@ -344,99 +459,46 @@ class RowPositive:
             column = self.matrix[:,i]
             for dimension in range(1, self.dimension):
                 angle = self.GetAngle(column, dimension)
-                if not self.slices[dimension].AddAngle(angle):
+                if not self.splitters[dimension].TryAngle(angle):
                     return False
         return True
-                
+
+    def GetV(self):
+        # this goes through the splitters and gets the points that fall within each splitter's slice
+        # then it scales all of them so that each points first entry (that corresponding to the zeroth
+        # dimension) is the same. Then it creates an array out of these and returns that
+        points = []
+        for splitter in self.splitters:
+            points.append(splitter.FindPoint())
+        # now we scale the tuples
+        scaled_points = ScaleTuples(points)
+        # and now we create our new vector
+        vector = [scaled_points[0][0]]
+        for point in scaled_points:
+            vector.append(point[1])
+        return vector
+
     def GetAngle(self, vector, dimension):
         y = vector[0]
         x = vector[dimension]
-        return atan2(y,x)
-    
-from vertex import Index   
-from copy import copy
+        value = atan2(y,x)
+        return Angle(value)
 
-class Point:
-    
-    def __init__(self, position):
-        self.position = position
+def ScaleTuples(tuples):
+    fracs = []
+    for tup in tuples:
+        fracs.append(Fraction(tup[1], tup[0]))
+    sum = Fraction()
+    for frac in fracs:
+        sum += frac
+    denominator = sum.denominator
+    new_tuples = []
+    for tup in tuples:
+        scaling = denominator / Fraction(tup[0])
+        new_tup = (denominator, scaling * Fraction(tup[1]))
+        new_tuples.append(new_tup)
+    return new_tuples
 
-class Lattice:
-    
-    def __init__(self):
-        self.points = []
-        self.marked = []
-        self.used_positions = []
-        self.index = Index(2, 0, 2)
-        
-    def GrowAbout(self, position):
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                new_position = copy(position)
-                new_position[0] += i
-                new_position[1] += j
-                if not self.index.GetElement(new_position):
-                    point = Point(new_position)
-                    self.index.AddElement(point)
-                    self.points.append(point)
-                    
-    def FindBestPoint(self, slice):
-        current_best_distance = 10000000
-        best_point = None
-        for point in self.points:
-            if point.position in self.used_positions:
-                continue
-            angle = self.GetAngle(point)
-            upper_dif = abs(angle - slice.upper[0])
-            lower_dif = abs(angle - slice.lower[0])
-            if upper_dif >= lower_dif:
-                if lower_dif < current_best_distance:
-                    current_best_distance = lower_dif
-                    best_point = point
-            else:
-                if upper_dif < current_best_distance:
-                    current_best_distance = upper_dif
-                    best_point = point
-        return best_point
-    
-    def FindMarkedPoints(self, slice):
-        for point in self.points:
-            angle = self.GetAngle(point)
-            if angle in slice:
-                self.marked.append(point) 
-                   
-    def Draw(self, canvas):
-        for point in self.points:
-            canvas.fill(path.circle(point.position[0], point.position[1], 0.04))
-            
-    def GetAngle(self, point):
-        angle = atan2(point.position[1], point.position[0])
-        if angle < 0:
-            angle = 2.0 * pi + angle
-        return angle 
-    
-    def GrowNext(self, slice):
-        best_point = self.FindBestPoint(slice)
-        self.GrowAbout(best_point.position)
-        
-    def FindPoint(self, slice, max=1000):
-        self.GrowAbout([0,0])
-        self.FindMarkedPoints(slice)
-        count = 0
-        while not self.marked:
-            point = self.FindBestPoint(slice)
-            self.GrowAbout(point.position)
-            self.used_positions.append(point.position)
-            self.FindMarkedPoints(slice)
-            count += 1
-            print('%s so far' % (count))
-            if count == max:
-                break
-        if self.marked:
-            print(self.marked[0].position)
-        print(count)
-        
-# What we are going to do is perform this over each angle and then get the 
-# axis we compared too to match up for all of these
+
 
         
