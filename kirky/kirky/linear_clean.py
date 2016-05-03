@@ -1,4 +1,4 @@
-from math import pi, atan2, sin, cos
+from math import pi, atan2, sin, cos, sqrt
 from pyx import path
 from issue import Issue
 from vertex import Index
@@ -170,9 +170,12 @@ class Slice:
         self.pi = Angle(pi)
         self.IS_EXCLUSION_SLICE = IS_EXCLUSION_SLICE
         self.exclusion_slice = None
+        self.norm_slice = None  # the norm slice holds the norm to the exclusion slice
         # now we check to see if we need to make an exclusion slice
         if not self.WAITING_FOR_ORIENTATION and not self.IS_EXCLUSION_SLICE:
             self.SetExclusionSlice()
+            self.SetNormSlice()
+
             
     def __contains__(self, angle):
         if self.IS_EXCLUSION_SLICE:
@@ -223,20 +226,38 @@ class Slice:
         # pi/2 smaller than the lower angle or opposite the upper 
         # angle, in this case whichever is larger.
         # So first we get these angles. 
-        increment = self.upper + (1/2) * self.pi
+        #increment = self.upper + (1/2) * self.pi
         opposite = self.lower.opposite()
-        if increment <= opposite:
-            angle1 = increment
-        else:
-            angle1 = opposite
-        increment = self.lower - (1/2) * self.pi
+        #if increment <= opposite:
+        #    angle1 = increment
+        #else:
+        angle1 = opposite
+       # increment = self.lower - (1/2) * self.pi
         opposite = self.upper.opposite()
-        if increment >= opposite:
-            angle2 = increment
-        else:
-            angle2 = opposite
+        #if increment >= opposite:
+        #    angle2 = increment
+        #else:
+        angle2 = opposite
         # now we can set the exclusion slice
         self.exclusion_slice = Slice(angle1, angle2, False)
+
+    def SetNormSlice(self):
+        # This will create a slice (exclusion to prevent recursion) where the input angles are
+        # the perpendiculars to the exclusion angles that are inside the self slice
+        upper_normal = self.exclusion_slice.upper + (1/2) * self.pi
+        lower_normal = self.exclusion_slice.upper - (1/2) * self.pi
+        # now we select the right normal
+        if upper_normal in self:
+            angle1 = upper_normal
+        else:
+            angle1 = lower_normal
+        upper_normal = self.exclusion_slice.lower + (1 / 2) * self.pi
+        lower_normal = self.exclusion_slice.lower - (1 / 2) * self.pi
+        if upper_normal in self:
+            angle2 = upper_normal
+        else:
+            angle2 = lower_normal
+        self.norm_slice = Slice(angle1, angle2, False)
         
             
     """
@@ -272,6 +293,7 @@ class Slice:
             self.WAITING_FOR_ORIENTATION = False
             if not self.IS_EXCLUSION_SLICE:
                 self.SetExclusionSlice()
+                self.SetNormSlice()
             # and we are done here!
             return True
         # in this case our slice and its exclusion bound is well set
@@ -422,6 +444,18 @@ class Splitter:
 
     def FindPoint(self):
         return self.point_finder.FindInteriorPoints()
+
+    def FindLargestDistance(self):
+        largest_distance = 1.0
+        for point in self.point_finder.points:
+            distance = sqrt(point[0] ** 2 + point[1] ** 2)
+            if distance > largest_distance:
+                largest_distance = distance
+        return largest_distance
+
+    def Draw(self, canvas):
+        self.slice.Draw(canvas, self.FindLargestDistance())
+        self.point_finder.Draw(canvas)
 
 """
 The following class takes a matrix and finds the size of the space you 
