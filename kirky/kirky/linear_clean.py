@@ -76,6 +76,7 @@ class Angle:
             value += 2.0 * pi
         while value >= 2 * pi:
             value -= 2.0 * pi
+        return value
     
     # this returns the number of radians needed to rotate the current 
     # angle to the other angle in a counterclockwise direction      
@@ -136,9 +137,12 @@ class Angle:
             return False
         
     def __add__(self, other):
-        return Angle(self.value + self.other)
+        return Angle(self.value + other.value)
     
     def __mul__(self, scalar):
+        return Angle(self.value * scalar)
+
+    def __rmul__(self, scalar):
         return Angle(self.value * scalar)
 
     def __sub__(self, other):
@@ -155,30 +159,31 @@ class Angle:
 
 class Slice:
     
-    def __init__(self, angle1, angle2, IS_EXCLUSION_SLICE=False):
-        self.Setup(angle1, angle2, IS_EXCLUSION_SLICE)
+    def __init__(self, angle1, angle2, IS_EXCLUSION_SLICE=False, IS_NORM_SLICE=False):
+        self.Setup(angle1, angle2, IS_EXCLUSION_SLICE, IS_NORM_SLICE)
             
-    def Setup(self, angle1, angle2, IS_EXCLUSION_SLICE=False):
+    def Setup(self, angle1, angle2, IS_EXCLUSION_SLICE=False, IS_NORM_SLICE = False):
+        self.bounds = []
         self.WAITING_FOR_ORIENTATION = False
         self.lower = None
         self.upper = None
+        self.pi = Angle(pi)
         # we classify the angles 
         self.ClassifyAngles(angle1, angle2)
         # now we set the two bounds
         if not self.WAITING_FOR_ORIENTATION:
             self.SetBounds()
-        self.pi = Angle(pi)
         self.IS_EXCLUSION_SLICE = IS_EXCLUSION_SLICE
+        self.IS_NORM_SLICE = IS_NORM_SLICE
         self.exclusion_slice = None
         self.norm_slice = None  # the norm slice holds the norm to the exclusion slice
         # now we check to see if we need to make an exclusion slice
         if not self.WAITING_FOR_ORIENTATION and not self.IS_EXCLUSION_SLICE:
             self.SetExclusionSlice()
-            self.SetNormSlice()
+            #self.SetNormSlice()
 
-            
     def __contains__(self, angle):
-        if self.IS_EXCLUSION_SLICE:
+        if self.IS_EXCLUSION_SLICE and not self.IS_NORM_SLICE:
             # exclusion slices are open intervals
             for bound in self.bounds:
                 if angle < bound[1] and angle > bound[0]:
@@ -216,6 +221,9 @@ class Slice:
             self.bounds.append((self.lower, self.upper))
     
     def SetExclusionSlice(self):
+        """
+        for now this is also going to create the norm slice
+        """
         # first we can only set exclusion slices on 
         # slices that aren't exclusion slices
         if self.IS_EXCLUSION_SLICE:
@@ -232,14 +240,19 @@ class Slice:
         #    angle1 = increment
         #else:
         angle1 = opposite
-       # increment = self.lower - (1/2) * self.pi
+        # now we need to get the angle corresponding to the norm slice
+        # for the lower this means we need the perpendicular that is less that this angle1
+        normal1 = angle1 - (1.0/2.0) * self.pi
+        # increment = self.lower - (1/2) * self.pi
         opposite = self.upper.opposite()
         #if increment >= opposite:
         #    angle2 = increment
         #else:
         angle2 = opposite
+        normal2 = angle2 + (1.0/2.0) * self.pi
         # now we can set the exclusion slice
-        self.exclusion_slice = Slice(angle1, angle2, False)
+        self.exclusion_slice = Slice(angle1, angle2, True)
+        self.norm_slice = Slice(normal1, normal2, True, True)
 
     def SetNormSlice(self):
         # This will create a slice (exclusion to prevent recursion) where the input angles are
@@ -257,7 +270,7 @@ class Slice:
             angle2 = upper_normal
         else:
             angle2 = lower_normal
-        self.norm_slice = Slice(angle1, angle2, False)
+        self.norm_slice = Slice(angle1, angle2, True)
         
             
     """
@@ -293,7 +306,7 @@ class Slice:
             self.WAITING_FOR_ORIENTATION = False
             if not self.IS_EXCLUSION_SLICE:
                 self.SetExclusionSlice()
-                self.SetNormSlice()
+                #self.SetNormSlice()
             # and we are done here!
             return True
         # in this case our slice and its exclusion bound is well set
@@ -331,20 +344,27 @@ class Slice:
     def Draw(self, canvas, circle_size):
         if not self.IS_EXCLUSION_SLICE:
             self.exclusion_slice.DrawBounds(canvas, circle_size)
-        self.Draw(canvas, circle_size)
+            self.norm_slice.DrawBounds(canvas, circle_size)
+        self.DrawBounds(canvas, circle_size)
+
+    def DrawNorm(self, canvas, circle_size):
+        self.norm_slice.DrawBounds(canvas, circle_size)
 
     def DrawBounds(self, canvas, circle_size):
         # so we are going to essentially draw two lines within the 
         # square given by the bounds (x,y)
         # we start with the upper
-        canvas.stroke(path.line(0,0,circle_size * cos(self.upper.value[0]), circle_size * sin(self.upper.value[0])))
+        canvas.stroke(path.line(0,0,circle_size * cos(self.upper.value), circle_size * sin(self.upper.value)))
         # then we do the lower
-        canvas.stroke(path.line(0,0,circle_size * cos(self.lower.value[0]), circle_size * sin(self.lower.value[0])))
+        canvas.stroke(path.line(0,0,circle_size * cos(self.lower.value), circle_size * sin(self.lower.value)))
 
 class Point:
 
     def __init__(self, position):
         self.position = position
+
+    def __getitem__(self, item):
+        return self.position[item]
 
 class InteriorPointFinder:
 
@@ -353,7 +373,7 @@ class InteriorPointFinder:
         self.interior = []
         self.used_positions = []
         self.index = Index(2, 0, 2)
-        self.slice = slice
+        self.slice = slice.norm_slice
 
     def GrowAbout(self, position):
         # this method adds lattice points in a square around the position
@@ -405,7 +425,7 @@ class InteriorPointFinder:
 
     # this method grows our lattice until we find one or more interior points
     # it returns the first one in the list of discovered ones
-    def FindInteriorPoints(self, max=None):
+    def FindPoints(self, max=None):
         # first we grow about 0,0
         self.GrowAbout([0,0])
         # then we look to see if there are any points inside the slice
@@ -443,7 +463,7 @@ class Splitter:
         return self.slice.AddAngle(angle)
 
     def FindPoint(self):
-        return self.point_finder.FindInteriorPoints()
+        return self.point_finder.FindPoints()
 
     def FindLargestDistance(self):
         largest_distance = 1.0
@@ -456,6 +476,9 @@ class Splitter:
     def Draw(self, canvas):
         self.slice.Draw(canvas, self.FindLargestDistance())
         self.point_finder.Draw(canvas)
+
+    def DrawNorm(self, canvas):
+        self.slice.DrawNorm(canvas, self.FindLargestDistance())
 
 """
 The following class takes a matrix and finds the size of the space you 
