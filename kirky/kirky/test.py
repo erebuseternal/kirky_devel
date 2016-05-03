@@ -1,12 +1,18 @@
-from linear_clean import Splitter, Angle
+from linear_clean import RowPositive
 from pyx import canvas
-from math import pi
+from sympy import Matrix
 
-a1 = Angle(pi - 0.05)
-a2 = Angle(3.0*pi/2.0 + 1.35)
-splitter = Splitter(a1,a2)
-splitter.FindPoint()
-c = canvas.canvas()
-splitter.Draw(c)
-c.writePDFfile('drawing')
-
+C = Matrix([[-1,2],[-3,-4]])
+r = RowPositive(C)
+all_good = r.CheckAndGenerate()
+count = 0
+"""
+for splitter in r.splitters:
+    c = canvas.canvas()
+    splitter.Draw(c)
+    c.writePDFfile('drawing%s' % (count))
+    count += 1
+"""
+print(all_good)
+if all_good:
+    print(r.GetV())

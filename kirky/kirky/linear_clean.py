@@ -366,6 +366,12 @@ class Point:
     def __getitem__(self, item):
         return self.position[item]
 
+    def __repr__(self):
+        return str(self)
+
+    def __str__(self):
+        return str(self.position)
+
 class InteriorPointFinder:
 
     def __init__(self, slice):
@@ -527,6 +533,7 @@ class RowPositive:
         points = []
         for splitter in self.splitters:
             points.append(splitter.FindPoint())
+        print(points)
         # now we scale the tuples
         scaled_points = ScaleTuples(points)
         # and now we create our new vector
@@ -542,13 +549,16 @@ class RowPositive:
         return Angle(value)
 
 def ScaleTuples(tuples):
+    print(tuples)
     fracs = []
     for tup in tuples:
         fracs.append(Fraction(tup[1], tup[0]))
+    print(fracs)
     sum = Fraction()
     for frac in fracs:
         sum += frac
     denominator = sum.denominator
+    print(denominator)
     new_tuples = []
     for tup in tuples:
         scaling = denominator / Fraction(tup[0])
